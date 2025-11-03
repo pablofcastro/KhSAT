@@ -14,7 +14,7 @@ pip install lark
 ```
 and
 ```
-pip install z3
+pip install z3-solver
 ```
 
 # Usage
