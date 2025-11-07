@@ -1,6 +1,10 @@
 # Project Name
 
-A SAT solver for the logics S5 and Kh
+A SAT solver for the logics S5 and Knowing-How logic.
+
+The algorithm for S5 is based on the paper:
+
+*Thomas Caridroit, Jean-Marie Lagniez, Daniel Le Berre, Tiago de Lima, Valentin Montmirail.  A SAT Based Approach for Solving the Modal Logic S5-Satisfiability Problem Thirty-First AAAI Conference on Artificial Intelligence, Feb 2017, San Francisco, United States*
 
 # Requirements
 
@@ -36,10 +40,13 @@ This will chec whether the S5 formula "E(E(X))" is SAT
 
 The syntax for the formula is:
 
-- "&" : boolean and
-- "|" : boolean or
-- "~" : boolean not
+- "&" : Boolean and
+- "|" : Boolean or
+- "~" : Boolean not
 - "A" : box modality
 - "E" : diamond modality
  
+# Author
+
+Pablo F. Castro (pablofcastro@gmail.com)
 
