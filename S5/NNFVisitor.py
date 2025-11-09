@@ -9,6 +9,12 @@ class ToNNF(visitor.FormulaVisitor) :
     def visit_var(self, var, info) :
         return var
     
+    def visit_true(self ,cons, info) :
+        return cons
+    
+    def visit_false(self ,cons, info) :
+        return cons
+    
     def visit_not(self, not_exp, info) :
         if str(not_exp) in self.result :
             return self.result[str(not_exp)] 

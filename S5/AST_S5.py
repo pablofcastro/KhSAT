@@ -31,16 +31,30 @@ class Var(Form):
         return visitor.visit_var(self, info)
 
 
-# Represents a constant (a number in [0,1])
+# Represents a constant
 class Constant(Form):
-    def __init__(self, value):
+    def __init__(self, value=None):
         self.value = value
 
     def __str__(self):
         return self.value
 
     def accept(self, visitor, info=None) :
-        return visitor.visit_constant(self, info)
+        pass
+
+class Top(Constant) :
+   def __str__(self) :
+       return "True"
+   
+   def accept(self, visitor,  info=None) :
+       return visitor.visit_true(self, info)
+   
+class Bot(Constant) :
+    def __str__(self) :
+       return "False"
+    
+    def accept(self, visitor,  info=None) :
+       return visitor.visit_false(self, info)
 
 
 # Base class for unary operations
@@ -52,7 +66,7 @@ class UnaryOperation(Form):
         pass
        
 
-# Unary operation for Luk. negation (lnot)
+# Unary operation 
 class Not(UnaryOperation):
     def __str__(self):
         return f"not {self.operand}"

@@ -17,6 +17,12 @@ class ToSAT(visitor.FormulaVisitor) :
             result = Bool(str(varexp))
         return result
     
+    def visit_true(self ,cons, info) :
+        return True
+    
+    def visit_false(self ,cons, info) :
+        return False
+
     def visit_not(self, notexp, info) :
         return Not(notexp.operand.accept(self, info)) 
 

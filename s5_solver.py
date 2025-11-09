@@ -15,6 +15,24 @@ def validate_file(f):
         raise argparse.ArgumentTypeError(f"Couldn't find {f}.")
     return f
 
+def get_model(parsed_form) : 
+    """ It returns a model for performing sat for already constructed formula"""
+    nnf_visitor = tonnf.ToNNF()
+    # a diamond visitor is created
+    diamond_visitor = diamond_counter.DiamondVisitor()
+    # formula is parser
+    #parsed_form = s5parser.parse(formula)
+    # the formula is translated to nnf
+    nnf_form = parsed_form.accept(nnf_visitor)
+    # we count the number of diamonds
+    n = nnf_form.accept(diamond_visitor)
+    # we translate the formula to sat
+    sat_visitor = tosat.ToSAT(n+1)
+    boolean_form = nnf_form.accept(sat_visitor,1)
+    s = Solver()
+    s.add(boolean_form)
+    return s
+
 def satS5(formula) :
     start_time = time.perf_counter()
     # a nnf visitor is created

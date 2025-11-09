@@ -17,6 +17,8 @@ grammar = """
          | "E" elem -> diamond
          | "A" elem -> box
          | var
+         | "true" -> true
+         | "false" -> false
          | "(" form ")"
 
     var: /[a-z_][a-z0-9_]*/   // Variable: alphanumeric starting with a letter
@@ -35,34 +37,16 @@ class ASTTransformer(Transformer) :
     box = ast.Box
     diamond = ast.Diamond
     var = ast.Var
+    true = ast.Top
+    false = ast.Bot
 
 # a function to parse a string, it returns an AST
 def parse(form) :
     parser = Lark(grammar, start='start', parser='lalr',  debug=True)
     tree = parser.parse(form)
     return ASTTransformer().transform(tree)
-    #fuzzy_parser = Lark(grammar, start='start', parser='lalr',  debug=True)
-    #tree = fuzzy_parser.parse(form)
-    #return ASTTransformer().transform(tree)
 
 # some tests for testing the parser
 def tests() :
     pass
- #   form1 = "x or y"
- #   form2 = "x"
- #   form3 = "x limplies (x lor y)"
- #   form4 = "x por ((x max z) min z)"
- #   form5 = "0.56 lor x"
-#
-#    fuzzy_parser = Lark(grammar, start='start', parser='lalr',  debug=True)
-#    fparser = Lark(grammar, start='start', parser='lalr',  debug=True)
-#   tree1 = fuzzy_parser.parse(form1)
-#    print(ASTTransformer().transform(tree1))
-#    tree2 = fuzzy_parser.parse(form2)
-#    print(ASTTransformer().transform(tree2))
-#    tree3 = fuzzy_parser.parse(form3)
-#    print(ASTTransformer().transform(tree3))
-#    tree4 = fuzzy_parser.parse(form4)
-#    print(ASTTransformer().transform(tree4))
-#    tree5 = fuzzy_parser.parse(form5)
-#    print(ASTTransformer().transform(tree5))
+ 

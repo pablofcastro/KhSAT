@@ -7,6 +7,12 @@ class DiamondVisitor(visitor.FormulaVisitor) :
     def __init__(self) :
         pass
 
+    def visit_true(self ,cons, info) :
+        return 0
+    
+    def visit_false(self ,cons, info) :
+        return 0
+
     def visit_var(self, var, info) :
         return 0
 
