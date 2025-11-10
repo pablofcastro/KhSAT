@@ -66,9 +66,11 @@ kh(A,B)
 ```
 where `A` and `B` are Boolean formulas without modalities. 
 
-
-
 # Author
 
 Pablo F. Castro (pablofcastro@gmail.com)
+
+# License
+
+SATKh is distributed under GPL V3.0 License.
 

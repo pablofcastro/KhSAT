@@ -19,7 +19,7 @@ grammar = """
     ?elem: "~" elem -> boolean_not
          | var
          | "true" -> true
-         | "false" -> flase
+         | "false" -> false
          | "(" form ")"
 
     var: /[a-z_][a-z0-9_]*/   // Variable: alphanumeric starting with a letter

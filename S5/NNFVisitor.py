@@ -23,7 +23,11 @@ class ToNNF(visitor.FormulaVisitor) :
             if (isinstance(subform, ast.Var)) : # var case
                 self.result[str(not_exp)] = not_exp
                 #return not_exp
-            if (isinstance(subform, ast.Not)) : # not case
+            elif (isinstance(subform, ast.Top)) :
+                self.result[str(not_exp)] = ast.Bot()
+            elif (isinstance(subform, ast.Bot)) :
+                self.result[str(not_exp)] = ast.Top()
+            elif (isinstance(subform, ast.Not)) : # not case
                 #return ast.Not(not_exp.operand.accept(self)) 
                 self.result[str(not_exp)] = ast.Not(not_exp.operand.accept(self)) 
             elif (isinstance(subform, ast.And)) : # and case
