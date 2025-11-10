@@ -23,6 +23,7 @@ pip install z3-solver
 
 # Usage
 
+## SAT for S5
 From the command line:
 
 ```
@@ -34,11 +35,24 @@ and you will see all the options for the sat solver. A simple example:
 ```
 python s5_solver.py -i "E E x"
 ```
-This will chec whether the S5 formula "E(E(X))" is SAT
+This will check whether the S5 formula "E(E(X))" is SAT
+
+## SAT for Kh
+
+The command line:
+```
+python kh_solver.py
+```
+executes the solver for Kh formulas, it takes a plain Kh formulas without nested modalities of the style:
+```
+kh(p,q);kh(s,t);~kh(p,t)
+```
+and checks whether the given collection of knowing hows is sat or not.
+
 
 # Syntax
 
-The syntax for the formula is:
+The syntax for a S5 formula is:
 
 - "&" : Boolean and
 - "|" : Boolean or
@@ -46,6 +60,14 @@ The syntax for the formula is:
 - "A" : box modality
 - "E" : diamond modality
  
+for Knowing-how formulas you have the knowing how modality, without nested modalities, i.e.:
+```
+kh(A,B)
+```
+where `A` and `B` are Boolean formulas without modalities. 
+
+
+
 # Author
 
 Pablo F. Castro (pablofcastro@gmail.com)
