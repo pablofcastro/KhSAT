@@ -16,7 +16,7 @@ if __name__ == '__main__':
             argv  = [f"{random.randint(0,b)}"]
             argv += [f"{random.randint(0,b)}"]
 
-            for i in range(b):
+            for i in range(random.randint(0,b)):
 
                 argv += [f"{random.randint(0,b)}.{random.randint(0,b)}"]
 

@@ -21,7 +21,7 @@ def khsabotage(s:list[tuple[int,int]]):
 
     for i in range(len(s)):
 
-        r += f"~kh(p{s[i][0]},p{s[i][1]})"
+        r += f"~kh(p{s[i][0]},p{s[i][1]});"
 
     return r
 
