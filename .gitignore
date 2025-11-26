@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+.DS_Store
+Benchmark/.DS_Store
+Benchmark/generator/.DS_Store
+Benchmark/generator/.vscode/launch.json
