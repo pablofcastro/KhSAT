@@ -113,10 +113,6 @@ file output-batch1.csv
 
 If you want to generate a plot from the results wout can use the script 
 
-# Author
-
-Pablo F. Castro (pablofcastro@gmail.com)
-
 # License
 
 SATKh is distributed under GPL V3.0 License.
