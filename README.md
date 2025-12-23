@@ -8,6 +8,8 @@ The algorithm for S5 is based on the paper:
 
 The Knowing-how logic is the one presented at:
 
+*Y. Wang. A logic of knowing how. In 5th International Workshop on Logic, Rationality, and Interaction (LORI 2015), volume 9394 of Lecture Notes in Computer Science, pages 392–405. Springer, 2015.*
+
 # Requirements
 
 - Python **>3.0**
