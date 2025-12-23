@@ -94,15 +94,18 @@ A benchmark is provided with the tool in the folder `Benchmark` as well as sever
 
 The benchmark consists of 500 randomly generated formulas as follows. For each 1 ≤ k ≤ 50, we generated 10 formulas with p positive occurrences of the Kh modality and q occurrences of ~Kh, where p is chosen uniformly at random from the interval [0, k]. Similarly, q is chosen uniformly at random from the interval [0, k−p]. 
 
-Typically you don't need to generate the benchamrk again. In the case you want to do it, the script `main.py` can be used for generating the benchmark. 
+The folder `Benchmark/scripts` contains scripts for generating and running the benchmark.
+
+Typically you don't need to generate the benchamrk again. In the case you want to do it, the script `Benchmark/scripts/main.py` can be used for generating the benchmark. 
 
 ** If you generate the benchmark the generated files will be different from the ones in the repository since they are ramdomly generated**
 
 ## Running the Benchmark
 
-For running the batch you can use the script `run_benchmark.py`, you can run the benchmark by batches with the option --benchmark. For instance:
+For running the batch you can use the script `Benchmark/scripts/run_benchmark.py`, you can run the benchmark by batches with the option --benchmark. For instance:
 
 ```
+cd Benchmark/scripts/
 python run_benchmark --benchmark 1
 ```
 runs the first batch of the examples consisting of formulas with k <= 10, as explained above. Similarly, you can run the script with 1,2,3,4,5.
@@ -111,7 +114,14 @@ file output-batch1.csv
 
 ## Generating the graphic
 
-If you want to generate a plot from the results wout can use the script 
+If you want to generate a plot from the results wout can use the script `generate_plot.py`.
+
+```
+cd Benchmark/scripts/
+python generate_plot.py
+```
+
+this generates the plot in a .jpg file.
 
 # License
 
