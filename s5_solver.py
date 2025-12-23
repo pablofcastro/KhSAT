@@ -88,8 +88,10 @@ if __name__ == "__main__" :
         problem = args.form
         satS5(problem)
     elif args.file :
-        file = args.file  
-        problem = file.read()
+        file_name = args.file 
+        with open(file_name, "r") as file:
+            problem = file.read() 
+            satS5(problem)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
