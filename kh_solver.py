@@ -220,7 +220,7 @@ if __name__ == "__main__" :
     if args.form :
         problem = args.form
         parsed_form = khparser.parse(problem)
-        translate_s5(parsed_form)
+        translate_s5_optimized(parsed_form)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
