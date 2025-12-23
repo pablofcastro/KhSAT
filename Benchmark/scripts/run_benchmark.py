@@ -69,7 +69,7 @@ if __name__ == "__main__" :
     )
     args = parser.parse_args()
     if  not args.all :
-        print("Processing batch: "+args.batch)
+        print(f"Processing batch: {args.batch}")
         process_batch(args.batch)
         print(f"Result written in output-batch{args.batch}.csv")
     else :

@@ -25,23 +25,31 @@ and
 pip install z3-solver
 ```
 
+In UBUNTU and other Linux distributions you can also install them using apt-get.
+
 # Usage
 
 ## SAT for S5
-From the command line:
+
+First you have to go to the main folder. For example, if the main folder is `KhSAT`:
+```
+cd KhSAT
+```
+Now, from the command line you can execute:
 
 ```
 python s5_solver.py
 ```
 
-and you will see all the options for the sat solver. A simple example:
+and you will see all the options for the SAT solver. A simple example:
 
 ```
 python s5_solver.py -i "E E x"
 ```
+
 This will check whether the S5 formula "E(E(X))" is SAT.
 
-THe S5 SAT solver also accepts files as inputs with the option -f. For example:
+THh S5 SAT solver also accepts files as inputs with the option -f. For example:
 
 ```
 python s5_solver.py -f Examples/formula1.s5

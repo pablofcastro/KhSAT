@@ -30,7 +30,7 @@ def validate_file(f):
 
 def Pi(D, I) :
     """
-        This implements the set of indexes \Pi(D) as described in the paper
+    This implements the set of indexes \\Pi(D) as described in the paper
     """
     result = {(i,i) for i in I}
     for i in I :
@@ -165,7 +165,7 @@ def translate_s5_optimized(problem) :
             if (verbose) :
                 print("Formula checked: "+str(final_form))
                 print("D: "+str(D))
-                print("Pi(D): "+str(Pi_D))
+                print("TC(~D): "+str(Pi_D))
             z3_model = s5solver.get_model(final_form)
             result = z3_model.check()
             if result == sat :
