@@ -1,18 +1,21 @@
-def khplus(n:int):
-    
-    r = ""
+import random
 
-    for i in range(n):
-        r += f"kh(p{i},p{i+1});"
+def khplus(n, k):
+    r = ""
+    indexes_pre = [random.randint(0, k) for _ in range(n)]
+    indexes_post = [random.randint(0, k) for _ in range(n)]
+    for i,j in zip(indexes_pre,indexes_post) :
+            r += f"Kh(p{i},p{j});"
 
     return r
 
-def khminus(n:int):
+def khminus(n, k):
     
     r = ""
-
-    for i in range(n):
-        r += f"~kh(q0{i},q1{i});"
+    indexes_pre = [random.randint(0, k) for _ in range(n)]
+    indexes_post = [random.randint(0, k) for _ in range(n)]
+    for i,j in zip(indexes_pre, indexes_post) :
+            r += f"~Kh(p{i},p{j});"
 
     return r
 
@@ -21,10 +24,11 @@ def khsabotage(s:list[tuple[int,int]]):
 
     for i in range(len(s)):
 
-        r += f"~kh(p{s[i][0]},p{s[i][1]});"
+        r += f"~Kh(p{s[i][0]},p{s[i][1]});"
 
     return r
 
-def phi(n:int, m:int, s:list[tuple[int,int]]):
-    
-    return khplus(n)+khminus(m)+khsabotage(s)
+def phi(n, m, k, s=[]):
+    #formula = khplus(n)+khminus(m)+khsabotage(s)
+    formula = khplus(n, k)+khminus(m, k)#+khsabotage(s)
+    return formula[:-1] # last semicolon removed
