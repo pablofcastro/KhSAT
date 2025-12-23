@@ -93,7 +93,7 @@ The syntax for a S5 formula is:
  
 for Knowing-how formulas you have the knowing how modality, without nested modalities, i.e.:
 ```
-kh(A,B)
+Kh(A,B)
 ```
 where `A` and `B` are Boolean formulas without modalities. 
 
@@ -107,7 +107,7 @@ The folder `Benchmark/scripts` contains scripts for generating and running the b
 
 Typically you don't need to generate the benchamrk again. In the case you want to do it, the script `Benchmark/scripts/main.py` can be used for generating the benchmark. 
 
-**If you generate the benchmark the generated files will be different from the ones in the repository since they are ramdomly generated**
+**If you generate again the benchmark the generated files will differ from the ones in the repository since they are ramdomly generated**
 
 ## Running the Benchmark
 
