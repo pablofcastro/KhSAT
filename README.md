@@ -68,7 +68,6 @@ Kh(p,q);Kh(s,t);~Kh(p,t)
 and checks whether the given collection of knowing hows is sat or not.
 
 The command takes a formula from the command line (with the -i option) or from a file. For example:
-
 ```
 python kh_solver -i 'Kh(p,q);Kh(s,t);~Kh(p,t)'
 ```
@@ -108,11 +107,11 @@ The folder `Benchmark/scripts` contains scripts for generating and running the b
 
 Typically you don't need to generate the benchamrk again. In the case you want to do it, the script `Benchmark/scripts/main.py` can be used for generating the benchmark. 
 
-** If you generate the benchmark the generated files will be different from the ones in the repository since they are ramdomly generated**
+**If you generate the benchmark the generated files will be different from the ones in the repository since they are ramdomly generated**
 
 ## Running the Benchmark
 
-For running the batch you can use the script `Benchmark/scripts/run_benchmark.py`, you can run the benchmark by batches with the option --benchmark. For instance:
+For running the batch you can use the script `Benchmark/scripts/run_benchmark.py` (from the main folder), you can run the benchmark by batches with the option --benchmark. For instance:
 
 ```
 cd Benchmark/scripts/
@@ -131,7 +130,7 @@ cd Benchmark/scripts/
 python generate_plot.py
 ```
 
-this generates the plot in a .jpg file.
+this generates the plot. 
 
 # License
 
