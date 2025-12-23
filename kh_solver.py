@@ -81,7 +81,7 @@ def translate_s5(problem) :
             if (verbose) :
                 print("Formula checked: "+str(final_form))
                 print("D: "+str(D))
-                print("Pi(D): "+str(Pi_D))
+                print("TC(~D): "+str(Pi_D))
             z3_model = s5solver.get_model(final_form)
             result = z3_model.check()
             if result == sat :
@@ -220,7 +220,7 @@ if __name__ == "__main__" :
     if args.form :
         problem = args.form
         parsed_form = khparser.parse(problem)
-        translate_s5(parsed_form)
+        translate_s5_optimized(parsed_form)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
