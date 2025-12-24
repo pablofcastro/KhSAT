@@ -25,7 +25,19 @@ and
 pip install z3-solver
 ```
 
-In UBUNTU and other Linux distributions you can also install them using apt-get.
+Note: In some system you have to use the command `python3` and `pip3` instead of `python` and `pip`.
+
+## Ubuntu
+In UBUNTU and other Linux distributions you can also install them using apt-get, for instance:
+
+```
+sudo apt install python3-lark
+```
+For installing Lark, and:
+```
+sudo apt install python3-z3
+```
+for installing Z3.
 
 # Usage
 
@@ -115,7 +127,7 @@ For running the batch you can use the script `Benchmark/scripts/run_benchmark.py
 
 ```
 cd Benchmark/scripts/
-python run_benchmark --benchmark 1
+python run_benchmark --batch 1
 ```
 runs the first batch of the examples consisting of formulas with k <= 10, as explained above. Similarly, you can run the script with 1,2,3,4,5.
 The results of the benchmark are saved in files .csv in files corresponding to the argument, for instance, in the example above you will get a 
