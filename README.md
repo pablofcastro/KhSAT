@@ -123,7 +123,7 @@ Typically you don't need to generate the benchamrk again. In the case you want t
 
 ## Running the Benchmark
 
-For running the batch you can use the script `Benchmark/scripts/run_benchmark.py` (from the main folder), you can run the benchmark by batches with the option --benchmark. For instance:
+For running the batch you can use the script `Benchmark/scripts/run_benchmark.py` (from the main folder), you can run the benchmark by batches with the option --batch. For instance:
 
 ```
 cd Benchmark/scripts/
