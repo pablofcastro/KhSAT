@@ -135,8 +135,10 @@ def translate_s5_optimized(problem) :
     second_and = astkh.Top()
     for f in neg_forms :
         second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
+    
+    l = list(IxI) # the list corresponding to the 
     for n in range(1,len(pos_forms)*len(pos_forms)+1) :
-        for D in itertools.combinations(list(IxI), n) :
+        for D in itertools.combinations(l, n) :
             elems = set(D)
             Pi_D = Pi(D,I)
             # we construct the S5 forms        
