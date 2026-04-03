@@ -146,10 +146,8 @@ def translate_s5_optimized(problem) :
         return 
     i = 0
     l = list(IxI) # the list corresponding to the IxI
-    for n in range(1,len(pos_forms)*len(pos_forms)+1) :
+    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
         for D in itertools.combinations(l, n) :
-            i=i+1
-            print(i)
             elems = set(D)
             Pi_D = Pi(D,I)
             # we construct the S5 forms        
