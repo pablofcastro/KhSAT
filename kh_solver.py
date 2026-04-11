@@ -81,7 +81,7 @@ def translate_s5(problem) :
             if (verbose) :
                 print("Formula checked: "+str(final_form))
                 print("D: "+str(D))
-                print("Pi(D): "+str(Pi_D))
+                print("TC(~D): "+str(Pi_D))
             z3_model = s5solver.get_model(final_form)
             result = z3_model.check()
             if result == sat :
@@ -135,8 +135,19 @@ def translate_s5_optimized(problem) :
     second_and = astkh.Top()
     for f in neg_forms :
         second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
-    for n in range(1,len(pos_forms)*len(pos_forms)+1) :
-        for D in itertools.combinations(list(IxI), n) :
+    z3_model = s5solver.get_model(astkh.And(first_and, second_and))
+    result = z3_model.check()
+    if result != sat :
+        print("UNSAT")
+        print("Formula: theta /\ theta' is unsat")
+        print("Rest of formulas unprocesed.")
+        end_time = time.perf_counter()
+        print(f"Time: {str(end_time - start_time)} seconds." )
+        return 
+    i = 0
+    l = list(IxI) # the list corresponding to the IxI
+    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
+        for D in itertools.combinations(l, n) :
             elems = set(D)
             Pi_D = Pi(D,I)
             # we construct the S5 forms        
