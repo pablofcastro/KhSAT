@@ -81,7 +81,7 @@ and checks whether the given collection of knowing hows is sat or not.
 
 The command takes a formula from the command line (with the -i option) or from a file. For example:
 ```
-python kh_solver -i 'Kh(p,q);Kh(s,t);~Kh(p,t)'
+python kh_solver.py -i 'Kh(p,q);Kh(s,t);~Kh(p,t)'
 ```
 checks the satisfiability of the given formula.
 

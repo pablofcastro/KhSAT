@@ -3,6 +3,7 @@ import os
 import csv
 import argparse
 import re
+import sys
 
 def process_batch(i) :
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+).kh$")
@@ -27,23 +28,32 @@ def process_batch(i) :
         row["form"] = instance[0]
         instance_path = os.path.join(f"../formulas/", file)
         print(f"Running: python kh_solver.py -f {instance_path}")
+        row["time"] = ""
+        row["result"] = ""
         try : 
-            output = subprocess.run(["python3", "../../kh_solver.py", "-f", instance_path], timeout=900, capture_output=True).stdout.decode()
+            output = subprocess.run([sys.executable, "../../kh_solver.py", "-f", instance_path], timeout=30, capture_output=True).stdout.decode()
             lines = output.splitlines()
             for line in lines :
                 if line.startswith("Time") :
                     row["time"] = line.split()[1]
                 elif line.startswith("The formula") :
                     row["result"] = line.split()[3]
+                elif line == "UNSAT" :
+                    row["result"] = "UNSAT"
         except Exception as e:
             print(f'Error running: {instance_path}:'+str(e))
             row["time"] = "900"
             row["result"] = "TO"
+        
+        if row["time"] == "" or row["result"] == "":
+            row["time"] = "ERR"
+            row["result"] = "ERR"
+
         processed = processed + 1
         print(f"Progress: {round((processed/total_files) * 100,1)}%")
         result.append(row)
 
-    fieldnames = result[0].keys()
+    fieldnames = ["form", "pos", "neg", "time", "result"]
 
     # Write to CSV
     with open(f"output-batch{i}.csv", "w", newline="") as f:
