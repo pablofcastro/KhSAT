@@ -38,7 +38,7 @@ def Pi(D, I) :
         result = result.union(new_pairs)
     return result
 
-def translate_s5(problem) :
+def translate_s5_optimized(problem) :
     """ 
     This method translate a kh formula to a s5 and perform a sat solving over it
     """
@@ -50,34 +50,51 @@ def translate_s5(problem) :
     I = range(1,len(pos_forms)+1) # number of positive forms
     J = range(1,len(neg_forms)+1) # number of negative forms
     IxI =  itertools.product(I, I)
-    for n in range(1,len(pos_forms)*len(pos_forms)+1) :
-        for D in itertools.combinations(list(IxI), n) :
+    first_and = astkh.Top()
+    # the following cycle compute: \bigwedge_{i \in I} E(\psi_j \wedge \neg \xi_i)
+    for f in pos_forms :
+        first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
+    second_and = astkh.Top()
+    for f in neg_forms :
+        second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
+    z3_model = s5solver.get_model(astkh.And(first_and, second_and))
+    result = z3_model.check()
+    if result != sat :
+        print("UNSAT")
+        print("Formula: theta /\ theta' is unsat")
+        print("Rest of formulas unprocesed.")
+        end_time = time.perf_counter()
+        print(f"Time: {str(end_time - start_time)} seconds." )
+        return 
+    i = 0
+    l = list(IxI) # the list corresponding to the IxI
+    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
+        for D in itertools.combinations(l, n) :
             elems = set(D)
             Pi_D = Pi(D,I)
-            # we construct the S5 forms
-            # the first conjunct
-            first_and = astkh.Top()
-            # the following cycle compute: \bigwedge_{i \in I} E(\psi_j \wedge \neg \xi_i)
-            for f in pos_forms :
-                first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
-            second_and = astkh.Top()
+            # we construct the S5 forms        
+            #second_and = astkh.Top()
             # now we compute the big conjunction:  
+            third_and = astkh.Top()
+            fourth_and = astkh.Top()
             for f in neg_forms :
                 # E(\psi_j \wedge \neg \xi_j)
-                second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
+                #second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
                 third_and = astkh.Top()
                 # we calculate: \Bigwedge_{(t,s) \in D} E(\xi_t \wedge \neg \psi_s)
                 for t,s in D :
                     third_and = astkh.And(third_and, astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left))))
-                second_and = astkh.And(second_and, third_and)
+                #second_and = astkh.And(second_and, third_and)
 
                 # now we calculate the last And
                 fourth_and = astkh.Top()
                 for s,t in Pi_D :
                     or_form = astkh.Or(astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right))))
                     fourth_and = astkh.And(fourth_and, or_form)
-                second_and = astkh.And(second_and, fourth_and) 
+                #second_and = astkh.And(second_and, fourth_and) 
             final_form = astkh.And(first_and, second_and) # this is the final form
+            final_form = astkh.And(final_form, third_and)
+            final_form = astkh.And(final_form, fourth_and)
             if (verbose) :
                 print("Formula checked: "+str(final_form))
                 print("D: "+str(D))
@@ -112,11 +129,10 @@ def translate_s5(problem) :
             print(f"Time: {str(end_time - start_time)} seconds." )
             return # we exit because a solution was found
     end_time = time.perf_counter()
-    print("the formula is unsat")
+    print("The formula is UNSAT")
     print(f"Time: {str(end_time - start_time)} seconds." )
 
-
-def translate_s5_optimized(problem) :
+def translate_s5_optimized_bis(problem) :
     """ 
     This method translate a kh formula to a s5 and perform a sat solving over it
     """
@@ -226,6 +242,154 @@ def translate_s5_optimized(problem) :
     end_time = time.perf_counter()
     print("The formula is UNSAT")
     print(f"Time: {str(end_time - start_time)} seconds." )
+
+def translate_s5_optimized_lu(problem) :
+    """ 
+    This method translate a kh formula to a s5 and perform a sat solving over it
+    """
+    assert isinstance(problem, astkh.Clauses)
+    start_time = time.perf_counter()
+    # we clasify the clauses into positive and negative
+    pos_forms = [form for form in problem.clauses if isinstance(form, astkh.Kh)]
+    neg_forms = [form for form in problem.clauses if isinstance(form, astkh.NKh)]
+
+    # if there is no negative forms we have to check only the positive ones
+    if (neg_forms == []) :
+        first_and = astkh.Top()
+        # now we compute the big conjunction:  
+        for f in pos_forms :
+            # 
+            first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
+        if verbose :
+            print(first_and)
+        z3_model = s5solver.get_model(first_and)
+        result = z3_model.check()
+        if result == sat :
+            end_time = time.perf_counter()
+            print("The formula is SAT.")
+            if verbose :
+                print("Model:")
+                print(z3_model.model())
+            print(f"Time: {str(end_time - start_time)} seconds." )
+            return # we exit because a solution was found
+
+    # if there is no positive forms we have to check only the negative ones
+    if (pos_forms == []) :
+        second_and = astkh.Top()
+        # now we compute the big conjunction:  
+        for f in neg_forms :
+            # E(\psi_j \wedge \neg \xi_j)
+            second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
+        if verbose :
+            print(second_and)
+        z3_model = s5solver.get_model(second_and)
+        result = z3_model.check()
+        if result == sat :
+            end_time = time.perf_counter()
+            print("The formula is SAT.")
+            if verbose :
+                print("Model:")
+                print(z3_model.model())
+            print(f"Time: {str(end_time - start_time)} seconds." )
+            return # we exit because a solution was found
+
+    # there are positive and negative atoms
+    first_and = astkh.Top()
+    for f in pos_forms :
+        first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
+    second_and = astkh.Top()
+    for f in neg_forms :
+        second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
+    z3_model = s5solver.get_model(astkh.And(first_and, second_and))
+    result = z3_model.check()
+    if result != sat :
+        print("UNSAT")
+        print("Formula: theta /\\ theta' is unsat")
+        print("Rest of formulas unprocesed.")
+        end_time = time.perf_counter()
+        print(f"Time: {str(end_time - start_time)} seconds." )
+        return 
+
+    I = range(1,len(pos_forms)+1) # number of positive forms
+    # Iteramos sobre itertools.product y lo guardamos directamente en la lista l
+    l = list(itertools.product(I, I)) 
+
+    # For each j, s, t, save the satisfiability of the formula: Θ+ ∧ Θ- ∧ (E(ψj ∧ ¬ψs) ∨ E(χt ∧ ¬χj))
+    green_results = {}
+    for j, f in enumerate(neg_forms):
+        for s, t in l:
+            or_form = astkh.Or(
+                astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
+                astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
+            )
+            
+            # Check if it is SAT in conjunction with Θ+ and Θ-
+            form_to_check = astkh.And(astkh.And(first_and, second_and), or_form)
+            z3_model_or = s5solver.get_model(form_to_check)
+            is_sat = (z3_model_or.check() == sat)
+            
+            # Save results using the tuple (j, s, t) as key
+            green_results[(j, s, t)] = is_sat
+
+    # For each s, t in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
+    red_results = {}
+    for t, s in l:
+        diamond_form = astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))
+        
+        # Check if it is SAT in conjunction with Θ+ and Θ-
+        form_to_check = astkh.And(astkh.And(first_and, second_and), diamond_form)
+        z3_model_diamond = s5solver.get_model(form_to_check)
+        is_sat = (z3_model_diamond.check() == sat)
+        
+        # Save results using the tuple (t, s) as key
+        red_results[(t, s)] = is_sat
+
+    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
+        for D in itertools.combinations(l, n) :
+            Pi_D = Pi(D,I)
+            
+            # If any green_results is False for any j and (s, t) in Pi_D, skip to the next D.
+            if any(not green_results[(j, s, t)] for j in range(len(neg_forms)) for s, t in Pi_D):
+                continue
+            # If any red_results is False for any (t, s) in D, skip to the next D.
+            if any(not red_results[(t, s)] for t, s in D):
+                continue
+
+            # we construct the S5 forms        
+            # now we compute the big conjunction:  
+            third_and = astkh.Top()
+            fourth_and = astkh.Top()
+
+            for f in neg_forms :
+                for s,t in Pi_D :
+                    or_form = astkh.Or(astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right))))
+                    third_and = astkh.And(third_and, or_form)
+                #second_and = astkh.And(second_and, fourth_and)
+
+            for t,s in D :
+                fourth_and = astkh.And(fourth_and, astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))) 
+
+            final_form = astkh.And(first_and, second_and) # this is the final form
+            final_form = astkh.And(final_form, third_and)
+            final_form = astkh.And(final_form, fourth_and)
+            if (verbose) :
+                print("Formula checked: "+str(final_form))
+                print("D: "+str(D))
+                print("TC(~D): "+str(Pi_D))
+            z3_model = s5solver.get_model(final_form)
+            result = z3_model.check()
+            if result == sat :
+                end_time = time.perf_counter()
+                print("The formula is SAT.")
+                if (verbose) :
+                    print("Model:")
+                    print(z3_model.model())
+                print(f"Time: {str(end_time - start_time)} seconds." )
+                return
+
+    end_time = time.perf_counter()
+    print("The formula is UNSAT")
+    print(f"Time: {str(end_time - start_time)} seconds." )
     
 if __name__ == "__main__" :
     """ This is the main function of the solver 
@@ -248,7 +412,7 @@ if __name__ == "__main__" :
     if args.form :
         problem = args.form
         parsed_form = khparser.parse(problem)
-        translate_s5_optimized(parsed_form)
+        translate_s5_optimized_lu(parsed_form)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
@@ -256,7 +420,7 @@ if __name__ == "__main__" :
             #print(problem)
             parsed_form = khparser.parse(problem)
             #translate_s5(parsed_form)
-            translate_s5_optimized(parsed_form)
+            translate_s5_optimized_lu(parsed_form)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
