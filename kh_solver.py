@@ -87,7 +87,7 @@ def translate_s5_optimized(problem) :
                 #second_and = astkh.And(second_and, third_and)
 
                 # now we calculate the last And
-                fourth_and = astkh.Top()
+                #fourth_and = astkh.Top()
                 for s,t in Pi_D :
                     or_form = astkh.Or(astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right))))
                     fourth_and = astkh.And(fourth_and, or_form)
@@ -316,8 +316,33 @@ def translate_s5_optimized_lu(problem) :
 
     # For each j, s, t, save the satisfiability of the formula: Θ+ ∧ Θ- ∧ (E(ψj ∧ ¬ψs) ∨ E(χt ∧ ¬χj))
     green_results = {}
+    
+    # Primero iteramos los valores donde s == t
+    for j, f in enumerate(neg_forms):
+        for s in I:
+            t = s
+            or_form = astkh.Or(
+                astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
+                astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
+            )
+            form_to_check = astkh.And(astkh.And(first_and, second_and), or_form)
+            z3_model_or = s5solver.get_model(form_to_check)
+            
+            if z3_model_or.check() != sat:
+                print("UNSAT")
+                print(f"Pruned directly from preprocessing because it was UNSAT for j={j} and s=t={s}")
+                end_time = time.perf_counter()
+                print(f"Time: {str(end_time - start_time)} seconds." )
+                return
+                
+            green_results[(j, s, t)] = True
+
+    # Despues iteramos sobre el resto donde s != t
     for j, f in enumerate(neg_forms):
         for s, t in l:
+            if s == t:
+                continue
+                
             or_form = astkh.Or(
                 astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
                 astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
@@ -405,6 +430,7 @@ if __name__ == "__main__" :
     parser.add_argument("-f", "--file", dest="file", type=validate_file,
                         help="the file with the formula", metavar="FILE")
     parser.add_argument("-i", "--inline", dest="form", help="takes a formula as inline input", metavar="FORMULA")
+    parser.add_argument("-m", "--method", dest="method", choices=["new", "old"], default="new", help="choose the translation method")
     args = parser.parse_args()
     
     if args.verbose :
@@ -412,15 +438,19 @@ if __name__ == "__main__" :
     if args.form :
         problem = args.form
         parsed_form = khparser.parse(problem)
-        translate_s5_optimized_lu(parsed_form)
+        if args.method == "new":
+            translate_s5_optimized_lu(parsed_form)
+        else:
+            translate_s5_optimized(parsed_form)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
             problem = file.read()
-            #print(problem)
             parsed_form = khparser.parse(problem)
-            #translate_s5(parsed_form)
-            translate_s5_optimized_lu(parsed_form)
+            if args.method == "new":
+                translate_s5_optimized_lu(parsed_form)
+            else:
+                translate_s5_optimized(parsed_form)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
