@@ -61,7 +61,7 @@ def translate_s5_optimized(problem) :
     result = z3_model.check()
     if result != sat :
         print("UNSAT")
-        print("Formula: theta /\ theta' is unsat")
+        #print("Formula: theta /\ theta' is unsat")
         print("Rest of formulas unprocesed.")
         end_time = time.perf_counter()
         print(f"Time: {str(end_time - start_time)} seconds." )
@@ -317,10 +317,14 @@ def translate_s5_optimized_lu(problem) :
     # For each j, s, t, save the satisfiability of the formula: Θ+ ∧ Θ- ∧ (E(ψj ∧ ¬ψs) ∨ E(χt ∧ ¬χj))
     green_results = {}
     
+    print(f"Número de positivos (|I|): {len(I)}, Lista |IxI|: {len(l)}")
+    print("Iniciando pre-cálculo de la diagonal (s=t) para green_results...")
+    
     # Primero iteramos los valores donde s == t
     for j, f in enumerate(neg_forms):
         for s in I:
             t = s
+            print(f"  -> green_results_diagonal: Evaluando j={j}, s=t={s}")
             or_form = astkh.Or(
                 astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
                 astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
@@ -337,12 +341,14 @@ def translate_s5_optimized_lu(problem) :
                 
             green_results[(j, s, t)] = True
 
+    print("Diagonal evaluada. Iniciando pre-cálculo para s != t en green_results...")
     # Despues iteramos sobre el resto donde s != t
     for j, f in enumerate(neg_forms):
         for s, t in l:
             if s == t:
                 continue
                 
+            print(f"  -> green_results_rest: Evaluando j={j}, s={s}, t={t}")
             or_form = astkh.Or(
                 astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
                 astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
@@ -356,9 +362,15 @@ def translate_s5_optimized_lu(problem) :
             # Save results using the tuple (j, s, t) as key
             green_results[(j, s, t)] = is_sat
 
+    print("green_results finalizado. Iniciando pre-cálculo de red_results...")
+    print("=== green_results ===")
+    for k, v in green_results.items():
+        print(f"  {k}: {v}")
+    print("=====================")
     # For each s, t in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
     red_results = {}
     for t, s in l:
+        print(f"  -> red_results: Evaluando t={t}, s={s}")
         diamond_form = astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))
         
         # Check if it is SAT in conjunction with Θ+ and Θ-
@@ -369,8 +381,15 @@ def translate_s5_optimized_lu(problem) :
         # Save results using the tuple (t, s) as key
         red_results[(t, s)] = is_sat
 
+    print("red_results finalizado. Comenzando la evaluación de las combinaciones (D)...")
+    print("=== red_results ===")
+    for k, v in red_results.items():
+        print(f"  {k}: {v}")
+    print("===================")
+    solver_calls_loop = 0
     for n in range(0,len(pos_forms)*len(pos_forms)+1) :
-        for D in itertools.combinations(l, n) :
+        print(f"==> Evaluando subconjuntos de tamaño n={n}")
+        for D in itertools.combinations(l, n) : #demasiado
             Pi_D = Pi(D,I)
             
             # If any green_results is False for any j and (s, t) in Pi_D, skip to the next D.
@@ -403,6 +422,8 @@ def translate_s5_optimized_lu(problem) :
                 print("TC(~D): "+str(Pi_D))
             z3_model = s5solver.get_model(final_form)
             result = z3_model.check()
+            solver_calls_loop += 1
+            print(f"Llamadas iterativas al solver: {solver_calls_loop}")
             if result == sat :
                 end_time = time.perf_counter()
                 print("The formula is SAT.")
