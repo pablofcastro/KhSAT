@@ -387,7 +387,7 @@ def translate_s5_optimized_lu(problem) :
         print(f"  {k}: {v}")
     print("===================")
     solver_calls_loop = 0
-    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
+    for n in range(len(pos_forms)*len(pos_forms),-1,-1) :
         print(f"==> Evaluando subconjuntos de tamaño n={n}")
         for D in itertools.combinations(l, n) : #demasiado
             Pi_D = Pi(D,I)
