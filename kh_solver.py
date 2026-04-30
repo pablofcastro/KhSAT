@@ -1,4 +1,3 @@
-
 """
 This module provide the basic behavior for performing SAT solving over plain Kh
 the input of the solver is a sequence of negated or basic modal formulas, for instance:
@@ -249,6 +248,7 @@ def translate_s5_optimized_lu(problem) :
     """
     assert isinstance(problem, astkh.Clauses)
     start_time = time.perf_counter()
+
     # we clasify the clauses into positive and negative
     pos_forms = [form for form in problem.clauses if isinstance(form, astkh.Kh)]
     neg_forms = [form for form in problem.clauses if isinstance(form, astkh.NKh)]
@@ -294,6 +294,7 @@ def translate_s5_optimized_lu(problem) :
             return # we exit because a solution was found
 
     # there are positive and negative atoms
+    # First, check SAT for Θ+ ∧ Θ- 
     first_and = astkh.Top()
     for f in pos_forms :
         first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
@@ -310,45 +311,50 @@ def translate_s5_optimized_lu(problem) :
         print(f"Time: {str(end_time - start_time)} seconds." )
         return 
 
-    I = range(1,len(pos_forms)+1) # number of positive forms
-    # Iteramos sobre itertools.product y lo guardamos directamente en la lista l
-    l = list(itertools.product(I, I)) 
+    # number of positive forms
+    I = range(1,len(pos_forms)+1) 
+    # Generate the Cartesian product IxI
+    IxI = list(itertools.product(I, I)) 
 
     # For each j, s, t, save the satisfiability of the formula: Θ+ ∧ Θ- ∧ (E(ψj ∧ ¬ψs) ∨ E(χt ∧ ¬χj))
-    green_results = {}
+    theta_D_disj_sat = {}
     
-    print(f"Número de positivos (|I|): {len(I)}, Lista |IxI|: {len(l)}")
-    print("Iniciando pre-cálculo de la diagonal (s=t) para green_results...")
+    print(f"Number of positives (|I|): {len(I)}, List |IxI| size: {len(IxI)}")
+    print("Starting pre-computation for cases where s=t for theta_D_disj_sat...")
     
-    # Primero iteramos los valores donde s == t
-    for j, f in enumerate(neg_forms):
+    # Check cases where (s == t)
+    for j, f in enumerate(neg_forms, 1):
         for s in I:
             t = s
-            print(f"  -> green_results_diagonal: Evaluando j={j}, s=t={s}")
+            print(f"  -> theta_D_disj_sat: j={j}, s=t={s}")
             or_form = astkh.Or(
                 astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
                 astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
             )
+
+            # Check if it is SAT in conjunction with Θ+ and Θ-
             form_to_check = astkh.And(astkh.And(first_and, second_and), or_form)
             z3_model_or = s5solver.get_model(form_to_check)
             
+            # Check SAT; if it fails, the entire formula is UNSAT because the identity is always required
             if z3_model_or.check() != sat:
                 print("UNSAT")
                 print(f"Pruned directly from preprocessing because it was UNSAT for j={j} and s=t={s}")
                 end_time = time.perf_counter()
                 print(f"Time: {str(end_time - start_time)} seconds." )
                 return
-                
-            green_results[(j, s, t)] = True
 
-    print("Diagonal evaluada. Iniciando pre-cálculo para s != t en green_results...")
-    # Despues iteramos sobre el resto donde s != t
-    for j, f in enumerate(neg_forms):
-        for s, t in l:
+            # Save results using the tuple (j-1, s-1, t-1) as key    
+            theta_D_disj_sat[(j-1, s-1, t-1)] = True
+
+    print("s=t evaluation complete. Starting pre-computation for s != t in theta_D_disj_sat...")
+    # Iterate over the rest of the entries where (s != t)
+    for j, f in enumerate(neg_forms, 1):
+        for s, t in IxI:
             if s == t:
                 continue
                 
-            print(f"  -> green_results_rest: Evaluando j={j}, s={s}, t={t}")
+            print(f"  -> theta_D_disj_sat: j={j}, s={s}, t={t}")
             or_form = astkh.Or(
                 astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), 
                 astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right)))
@@ -359,18 +365,21 @@ def translate_s5_optimized_lu(problem) :
             z3_model_or = s5solver.get_model(form_to_check)
             is_sat = (z3_model_or.check() == sat)
             
-            # Save results using the tuple (j, s, t) as key
-            green_results[(j, s, t)] = is_sat
+            # Save results using the tuple (j-1, s-1, t-1) as key
+            theta_D_disj_sat[(j-1, s-1, t-1)] = is_sat
 
-    print("green_results finalizado. Iniciando pre-cálculo de red_results...")
-    print("=== green_results ===")
-    for k, v in green_results.items():
+    
+    print("=== theta_D_disj_sat ===")
+    for k, v in theta_D_disj_sat.items():
         print(f"  {k}: {v}")
     print("=====================")
+
+    print("green_results finalizado. Iniciando pre-cálculo de red_results...")
+
     # For each s, t in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
-    red_results = {}
-    for t, s in l:
-        print(f"  -> red_results: Evaluando t={t}, s={s}")
+    theta_D_exist_sat = {}
+    for t, s in IxI:
+        print(f"  -> red_results: t={t}, s={s}")
         diamond_form = astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))
         
         # Check if it is SAT in conjunction with Θ+ and Θ-
@@ -378,25 +387,28 @@ def translate_s5_optimized_lu(problem) :
         z3_model_diamond = s5solver.get_model(form_to_check)
         is_sat = (z3_model_diamond.check() == sat)
         
-        # Save results using the tuple (t, s) as key
-        red_results[(t, s)] = is_sat
+        # Save results using the tuple (t-1, s-1) as key
+        theta_D_exist_sat[(t-1, s-1)] = is_sat
 
-    print("red_results finalizado. Comenzando la evaluación de las combinaciones (D)...")
-    print("=== red_results ===")
-    for k, v in red_results.items():
+    print("=== theta_D_exist_sat ===")
+    for k, v in theta_D_exist_sat.items():
         print(f"  {k}: {v}")
     print("===================")
+
     solver_calls_loop = 0
+
+    # Iterate over all subsets D of IxI
+    print("theta_D_exist_sat complete. Starting evaluation of combinations (D)...")
     for n in range(len(pos_forms)*len(pos_forms),-1,-1) :
-        print(f"==> Evaluando subconjuntos de tamaño n={n}")
-        for D in itertools.combinations(l, n) : #demasiado
+        print(f"==> Evaluating subsets of size n={n}")
+        for D in itertools.combinations(IxI, n) : 
             Pi_D = Pi(D,I)
             
-            # If any green_results is False for any j and (s, t) in Pi_D, skip to the next D.
-            if any(not green_results[(j, s, t)] for j in range(len(neg_forms)) for s, t in Pi_D):
+            # If any theta_D_disj_sat is False for any j and (s, t) in Pi_D, skip to the next D.
+            if any(not theta_D_disj_sat[(j, s-1, t-1)] for j in range(len(neg_forms)) for s, t in Pi_D):
                 continue
-            # If any red_results is False for any (t, s) in D, skip to the next D.
-            if any(not red_results[(t, s)] for t, s in D):
+            # If any theta_D_exist_sat is False for any (t, s) in D, skip to the next D.
+            if any(not theta_D_exist_sat[(t-1, s-1)] for t, s in D):
                 continue
 
             # we construct the S5 forms        
@@ -408,12 +420,11 @@ def translate_s5_optimized_lu(problem) :
                 for s,t in Pi_D :
                     or_form = astkh.Or(astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right))))
                     third_and = astkh.And(third_and, or_form)
-                #second_and = astkh.And(second_and, fourth_and)
 
             for t,s in D :
                 fourth_and = astkh.And(fourth_and, astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))) 
 
-            final_form = astkh.And(first_and, second_and) # this is the final form
+            final_form = astkh.And(first_and, second_and) 
             final_form = astkh.And(final_form, third_and)
             final_form = astkh.And(final_form, fourth_and)
             if (verbose) :
@@ -422,8 +433,10 @@ def translate_s5_optimized_lu(problem) :
                 print("TC(~D): "+str(Pi_D))
             z3_model = s5solver.get_model(final_form)
             result = z3_model.check()
+
             solver_calls_loop += 1
-            print(f"Llamadas iterativas al solver: {solver_calls_loop}")
+            print(f"Solver calls: {solver_calls_loop}")
+
             if result == sat :
                 end_time = time.perf_counter()
                 print("The formula is SAT.")
