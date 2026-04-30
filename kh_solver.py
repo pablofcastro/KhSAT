@@ -319,6 +319,9 @@ def translate_s5_optimized_lu(problem) :
     # For each j, s, t, save the satisfiability of the formula: Θ+ ∧ Θ- ∧ (E(ψj ∧ ¬ψs) ∨ E(χt ∧ ¬χj))
     theta_D_disj_sat = {}
     
+    # Set of mandatory pairs that MUST be in D (because they break the disjunction condition)
+    theta_D_disj_sat_false = set()
+    
     print(f"Number of positives (|I|): {len(I)}, List |IxI| size: {len(IxI)}")
     print("Starting pre-computation for cases where s=t for theta_D_disj_sat...")
     
@@ -367,6 +370,10 @@ def translate_s5_optimized_lu(problem) :
             
             # Save results using the tuple (j-1, s-1, t-1) as key
             theta_D_disj_sat[(j-1, s-1, t-1)] = is_sat
+            if not is_sat:
+                # If it's UNSAT, the edge (s, t) cannot be in the transitive closure Pi(D).
+                # Therefore, we MUST include (s, t) in D to break this edge.
+                theta_D_disj_sat_false.add((s, t))
 
     
     print("=== theta_D_disj_sat ===")
@@ -378,6 +385,9 @@ def translate_s5_optimized_lu(problem) :
 
     # For each s, t in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
     theta_D_exist_sat = {}
+    
+    # Set of forbidden pairs that CANNOT be in D (because they break the conjunction condition)
+    theta_D_exist_sat_false = set()
     for t, s in IxI:
         print(f"  -> red_results: t={t}, s={s}")
         diamond_form = astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))
@@ -389,6 +399,9 @@ def translate_s5_optimized_lu(problem) :
         
         # Save results using the tuple (t-1, s-1) as key
         theta_D_exist_sat[(t-1, s-1)] = is_sat
+        if not is_sat:
+            # If it's UNSAT, this specific edge (t, s) is strictly forbidden from being in D.
+            theta_D_exist_sat_false.add((t, s))
 
     print("=== theta_D_exist_sat ===")
     for k, v in theta_D_exist_sat.items():
@@ -397,19 +410,42 @@ def translate_s5_optimized_lu(problem) :
 
     solver_calls_loop = 0
 
-    # Iterate over all subsets D of IxI
+
+
+    print(f"theta_D_disj_sat_false: {theta_D_disj_sat_false}")
+    print(f"theta_D_exist_sat_false: {theta_D_exist_sat_false}")
+
+    # Check for contradictions: If a pair must be in D but is also forbidden from D,
+    # then no valid subset D can exist, and the formula is UNSAT.
+    intersection = theta_D_disj_sat_false.intersection(theta_D_exist_sat_false)
+    if intersection:
+        print("Intersection between theta_D_disj_sat_false and theta_D_exist_sat_false is not empty!")
+        print(f"Intersection: {intersection}")
+        end_time = time.perf_counter()
+        print("The formula is UNSAT")
+        print(f"Time: {str(end_time - start_time)} seconds." )
+        return
+
+    # The search space for D is IxI minus the forbidden pairs and the mandatory pairs.
+    IxI_filtered = set(IxI) - theta_D_exist_sat_false - theta_D_disj_sat_false
+
+    # Iterate over all valid subsets D_subset of IxI_filtered
     print("theta_D_exist_sat complete. Starting evaluation of combinations (D)...")
-    for n in range(len(pos_forms)*len(pos_forms),-1,-1) :
-        print(f"==> Evaluating subsets of size n={n}")
-        for D in itertools.combinations(IxI, n) : 
+    for n in range(len(IxI_filtered), -1, -1) :
+        print(f"==> Evaluating subsets of size n={n} (total D size: {n + len(theta_D_disj_sat_false)})")
+        for D_subset in itertools.combinations(IxI_filtered, n) : 
+            # D is constructed by taking a valid subset and enforcing the mandatory pairs
+            D = set(D_subset).union(theta_D_disj_sat_false)
             Pi_D = Pi(D,I)
             
             # If any theta_D_disj_sat is False for any j and (s, t) in Pi_D, skip to the next D.
             if any(not theta_D_disj_sat[(j, s-1, t-1)] for j in range(len(neg_forms)) for s, t in Pi_D):
                 continue
+
+            # Not necessary
             # If any theta_D_exist_sat is False for any (t, s) in D, skip to the next D.
-            if any(not theta_D_exist_sat[(t-1, s-1)] for t, s in D):
-                continue
+            #if any(not theta_D_exist_sat[(t-1, s-1)] for t, s in D):
+            #    continue
 
             # we construct the S5 forms        
             # now we compute the big conjunction:  

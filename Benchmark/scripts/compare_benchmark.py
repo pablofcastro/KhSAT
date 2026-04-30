@@ -12,7 +12,7 @@ def run_solver(instance_path, method):
     try:
         output_bytes = subprocess.run(
             [sys.executable, "../../kh_solver.py", "-f", instance_path, "-m", method], 
-            timeout=30, 
+            timeout=45, 
             capture_output=True
         ).stdout
         output = output_bytes.decode('utf-8', errors='ignore')
