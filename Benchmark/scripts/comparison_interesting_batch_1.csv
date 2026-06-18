@@ -1,0 +1,10 @@
+form,pos,neg,time_new,result_new,time_old,result_old,fastest
+formula1,1,1,0.008950799994636327,UNSAT,0.01171960000647232,UNSAT,new
+formula2,2,1,0.0330283000075724,UNSAT,0.15075220000289846,UNSAT,new
+formula3,3,1,0.08285179999074899,UNSAT,12.739492699998664,UNSAT,new
+formula4,4,1,0.31418410000333097,UNSAT,90,TO,new
+formula5,5,1,71.52775949999341,UNSAT,90,TO,new
+formula6,6,1,90,TO,90,TO,tie
+formula7,7,1,90,TO,90,TO,tie
+formula8,8,1,90,TO,90,TO,tie
+formula9,9,1,90,TO,90,TO,tie

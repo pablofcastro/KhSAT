@@ -12,7 +12,7 @@ def run_solver(instance_path, method):
     try:
         output_bytes = subprocess.run(
             [sys.executable, "../../kh_solver.py", "-f", instance_path, "-m", method], 
-            timeout=45, 
+            timeout=90, 
             capture_output=True
         ).stdout
         output = output_bytes.decode('utf-8', errors='ignore')
@@ -30,16 +30,15 @@ def run_solver(instance_path, method):
                 
         return result_val, time_val
     except subprocess.TimeoutExpired:
-        return "TO", "900"
+        return "TO", "90"
     except Exception as e:
         print(f"Error running {instance_path} with method {method}: {e}")
-        return "ERR", "900"
+        return "ERR", "90"
 
-def process_batch(i):
+def process_batch(i, formulas_dir="../formulas/"):
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+).kh$")
     files = []
     
-    formulas_dir = "../formulas/"
     if not os.path.exists(formulas_dir):
         print(f"Directory not found: {formulas_dir}")
         return
@@ -54,7 +53,7 @@ def process_batch(i):
     result = [] # list of dicts, each dict is a row
     total_files = len(files)
     if total_files == 0:
-        print(f"No files found for batch {i}")
+        print(f"No files found for batch {i} in directory {formulas_dir}")
         return
         
     print(f"Running comparison for batch {i} ({total_files} files)")
@@ -107,7 +106,7 @@ def process_batch(i):
         
     fieldnames = result[0].keys()
     
-    csv_file = f"comparison_batch_{i}.csv"
+    csv_file = f"comparison_batch_{i}.csv" if formulas_dir == "../formulas/" else f"comparison_interesting_batch_{i}.csv"
     with open(csv_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -115,9 +114,9 @@ def process_batch(i):
         
     print(f"Comparison results saved to {csv_file}")
     
-    plot_results(result, i)
+    plot_results(result, i, formulas_dir)
 
-def plot_results(data, batch_ind):
+def plot_results(data, batch_ind, formulas_dir="../formulas/"):
     df = pd.DataFrame(data)
     
     # Contamos cuantas instancias cayeron en cada categoria
@@ -153,20 +152,27 @@ def plot_results(data, batch_ind):
                         ha='center', va='bottom')
 
     plt.tight_layout()
-    plt.savefig(f"comparison_plot_batch_{batch_ind}.png")
-    print(f"Plot saved as comparison_plot_batch_{batch_ind}.png")
+    plot_name = f"comparison_plot_batch_{batch_ind}.png" if formulas_dir == "../formulas/" else f"comparison_plot_interesting_batch_{batch_ind}.png"
+    plt.savefig(plot_name)
+    print(f"Plot saved as {plot_name}")
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process the formulas in batches and compare methods.")
+    parser.add_argument(
+        "--dir",
+        type=str,
+        default="../formulas/",
+        help="Path to the directory containing formulas (default: ../formulas/)"
+    )
     parser.add_argument("--batch", type=int, default=10, help="The batch to be processed: 1, 2, 3...")
     parser.add_argument("--all", action='store_true', help="Option to process all the batches")
     
     args = parser.parse_args()
     if not args.all:
-        print(f"Processing batch: {args.batch}")
-        process_batch(args.batch)
+        print(f"Processing batch: {args.batch} from directory: {args.dir}")
+        process_batch(args.batch, args.dir)
     else:
         for i in [1,2,3,4,5]:
-            print(f"Processing batch {i}")
-            process_batch(i)
+            print(f"Processing batch {i} from directory: {args.dir}")
+            process_batch(i, args.dir)
 

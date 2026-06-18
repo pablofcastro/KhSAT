@@ -12,7 +12,7 @@ import sys
 import time
 import itertools
 from functools import reduce # foldl
-sys.setrecursionlimit(5000)
+sys.setrecursionlimit(100000)
 
 verbose = False # the tools shows more information hwne verbose is true
 start_time = 0 # to save the start_time for the sat
@@ -131,117 +131,6 @@ def translate_s5_optimized(problem) :
     print("The formula is UNSAT")
     print(f"Time: {str(end_time - start_time)} seconds." )
 
-def translate_s5_optimized_bis(problem) :
-    """ 
-    This method translate a kh formula to a s5 and perform a sat solving over it
-    """
-    assert isinstance(problem, astkh.Clauses)
-    start_time = time.perf_counter()
-    # we clasify the clauses into positive and negative
-    pos_forms = [form for form in problem.clauses if isinstance(form, astkh.Kh)]
-    neg_forms = [form for form in problem.clauses if isinstance(form, astkh.NKh)]
-
-    # if there is no negative forms we have to check only the positive ones
-    if (neg_forms == []) :
-        first_and = astkh.Top()
-        # now we compute the big conjunction:  
-        for f in pos_forms :
-            # 
-            first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
-        if verbose :
-            print(first_and)
-        z3_model = s5solver.get_model(first_and)
-        result = z3_model.check()
-        if result == sat :
-            end_time = time.perf_counter()
-            print("The formula is SAT.")
-            if verbose :
-                print("Model:")
-                print(z3_model.model())
-            print(f"Time: {str(end_time - start_time)} seconds." )
-            return # we exit because a solution was found
-
-    # if there is no positive forms we have to check only the negative ones
-    if (pos_forms == []) :
-        second_and = astkh.Top()
-        # now we compute the big conjunction:  
-        for f in neg_forms :
-            # E(\psi_j \wedge \neg \xi_j)
-            second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
-        if verbose :
-            print(second_and)
-        z3_model = s5solver.get_model(second_and)
-        result = z3_model.check()
-        if result == sat :
-            end_time = time.perf_counter()
-            print("The formula is SAT.")
-            if verbose :
-                print("Model:")
-                print(z3_model.model())
-            print(f"Time: {str(end_time - start_time)} seconds." )
-            return # we exit because a solution was found
-
-    # there are positive and negative atoms
-    first_and = astkh.Top()
-    for f in pos_forms :
-        first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
-    second_and = astkh.Top()
-    for f in neg_forms :
-        second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
-    z3_model = s5solver.get_model(astkh.And(first_and, second_and))
-    result = z3_model.check()
-    if result != sat :
-        print("UNSAT")
-        print("Formula: theta /\\ theta' is unsat")
-        print("Rest of formulas unprocesed.")
-        end_time = time.perf_counter()
-        print(f"Time: {str(end_time - start_time)} seconds." )
-        return 
-
-    I = range(1,len(pos_forms)+1) # number of positive forms
-    IxI =  itertools.product(I, I)
-    #first_and = astkh.Top()
-    l = list(IxI) # the list corresponding to the IxI
-    for n in range(0,len(pos_forms)*len(pos_forms)+1) :
-        for D in itertools.combinations(l, n) :
-            elems = set(D)
-            Pi_D = Pi(D,I)
-            # we construct the S5 forms        
-            # now we compute the big conjunction:  
-            third_and = astkh.Top()
-            fourth_and = astkh.Top()
-
-            for f in neg_forms :
-                for s,t in Pi_D :
-                    or_form = astkh.Or(astkh.Diamond(astkh.And(f.left, astkh.Not(pos_forms[s-1].left))), astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(f.right))))
-                    third_and = astkh.And(third_and, or_form)
-                #second_and = astkh.And(second_and, fourth_and)
-
-            for t,s in D :
-                fourth_and = astkh.And(fourth_and, astkh.Diamond(astkh.And(pos_forms[t-1].right, astkh.Not(pos_forms[s-1].left)))) 
-
-            final_form = astkh.And(first_and, second_and) # this is the final form
-            final_form = astkh.And(final_form, third_and)
-            final_form = astkh.And(final_form, fourth_and)
-            if (verbose) :
-                print("Formula checked: "+str(final_form))
-                print("D: "+str(D))
-                print("TC(~D): "+str(Pi_D))
-            z3_model = s5solver.get_model(final_form)
-            result = z3_model.check()
-            if result == sat :
-                end_time = time.perf_counter()
-                print("The formula is SAT.")
-                if (verbose) :
-                    print("Model:")
-                    print(z3_model.model())
-                print(f"Time: {str(end_time - start_time)} seconds." )
-                return
-
-    end_time = time.perf_counter()
-    print("The formula is UNSAT")
-    print(f"Time: {str(end_time - start_time)} seconds." )
-
 def translate_s5_optimized_lu(problem) :
     """ 
     This method translate a kh formula to a s5 and perform a sat solving over it
@@ -258,7 +147,7 @@ def translate_s5_optimized_lu(problem) :
         first_and = astkh.Top()
         # now we compute the big conjunction:  
         for f in pos_forms :
-            # 
+            # Θ+
             first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
         if verbose :
             print(first_and)
@@ -278,7 +167,7 @@ def translate_s5_optimized_lu(problem) :
         second_and = astkh.Top()
         # now we compute the big conjunction:  
         for f in neg_forms :
-            # E(\psi_j \wedge \neg \xi_j)
+            # Θ-
             second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
         if verbose :
             print(second_and)
@@ -372,7 +261,7 @@ def translate_s5_optimized_lu(problem) :
             theta_D_disj_sat[(j-1, s-1, t-1)] = is_sat
             if not is_sat:
                 # If it's UNSAT, the edge (s, t) cannot be in the transitive closure Pi(D).
-                # Therefore, we MUST include (s, t) in D to break this edge.
+                # Therefore, we MUST include (s, t) in D to avoid unsat.
                 theta_D_disj_sat_false.add((s, t))
 
     
@@ -383,7 +272,7 @@ def translate_s5_optimized_lu(problem) :
 
     print("green_results finalizado. Iniciando pre-cálculo de red_results...")
 
-    # For each s, t in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
+    # For each t, s in IxI save the satisfiability of the formula: Θ+ ∧ Θ- ∧ E(χt ∧ ¬ψs)
     theta_D_exist_sat = {}
     
     # Set of forbidden pairs that CANNOT be in D (because they break the conjunction condition)

@@ -5,11 +5,14 @@ import argparse
 import re
 import sys
 
-def process_batch(i) :
+def process_batch(i, formulas_dir="../formulas/") :
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+).kh$")
     files = []
     size = 0
-    for filename in os.listdir(f"../formulas/"):
+    if not os.path.exists(formulas_dir):
+        print(f"Directory not found: {formulas_dir}")
+        return
+    for filename in os.listdir(formulas_dir):
         size = size + 1
         m = pattern.match(filename)
         if m:
@@ -19,6 +22,9 @@ def process_batch(i) :
     result = {}
     result = [] # the result is a list of dics, each dict is a row
     total_files = len(files)
+    if total_files == 0:
+        print(f"No files found for batch {i} in directory {formulas_dir}")
+        return
     processed = 0
     for file in files :
         row = {}
@@ -26,7 +32,7 @@ def process_batch(i) :
         row["neg"] = instance[2]
         row["pos"] = instance[1]
         row["form"] = instance[0]
-        instance_path = os.path.join(f"../formulas/", file)
+        instance_path = os.path.join(formulas_dir, file)
         print(f"Running: python kh_solver.py -f {instance_path}")
         row["time"] = ""
         row["result"] = ""
@@ -56,13 +62,21 @@ def process_batch(i) :
     fieldnames = ["form", "pos", "neg", "time", "result"]
 
     # Write to CSV
-    with open(f"output-batch{i}.csv", "w", newline="") as f:
+    csv_name = f"output-batch{i}.csv" if formulas_dir == "../formulas/" else f"output-interesting-batch{i}.csv"
+    with open(csv_name, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()     # write header row
         writer.writerows(result)   # write data rows
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser(description="Process the formulas in batches.")
+
+    parser.add_argument(
+        "--dir",
+        type=str,
+        default="../formulas/",
+        help="Path to the directory containing formulas (default: ../formulas/)"
+    )
 
     parser.add_argument(
         "--batch",
@@ -79,11 +93,12 @@ if __name__ == "__main__" :
     )
     args = parser.parse_args()
     if  not args.all :
-        print(f"Processing batch: {args.batch}")
-        process_batch(args.batch)
-        print(f"Result written in output-batch{args.batch}.csv")
+        print(f"Processing batch: {args.batch} from directory: {args.dir}")
+        process_batch(args.batch, args.dir)
+        csv_name = f"output-batch{args.batch}.csv" if args.dir == "../formulas/" else f"output-interesting-batch{args.batch}.csv"
+        print(f"Result written in {csv_name}")
     else :
         for i in [1,2,3,4,5] :
-            print("Processing all the formulas")
-            process_batch(i)
+            print(f"Processing all the formulas in batch {i} from directory: {args.dir}")
+            process_batch(i, args.dir)
 
