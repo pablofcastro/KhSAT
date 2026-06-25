@@ -78,7 +78,7 @@ class Not(UnaryOperation):
 # Unary operation for box
 class Box(UnaryOperation):
     def __str__(self):
-        return f"A {self.operand}"
+        return f"[r1] {self.operand}"
 
     def accept(self, visitor, info=None) :
         return visitor.visit_box(self, info)
@@ -86,7 +86,7 @@ class Box(UnaryOperation):
 # Unary operation for diamond
 class Diamond(UnaryOperation):
     def __str__(self):
-        return f"E {self.operand}"
+        return f"<r1> {self.operand}"
 
     def accept(self, visitor, info = None) :
         return visitor.visit_diamond(self, info)
