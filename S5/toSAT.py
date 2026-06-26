@@ -44,6 +44,7 @@ class ToSAT(visitor.FormulaVisitor) :
             subforms = [ subform.accept(self, i+1) for i in range(self.size) ]
             self.result[str(boxexp)] = And(subforms)
             return self.result[str(boxexp)]
+           
 
     def visit_diamond(self, diamondexp, info) :
         if str(diamondexp) in self.result  :

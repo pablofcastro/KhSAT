@@ -14,8 +14,8 @@ grammar = """
          | disj "|" elem-> boolean_or
      
     ?elem: "~" elem -> boolean_not
-         | "<r1>" elem -> diamond
-         | "[r1]" elem -> box
+         | "E" elem -> diamond
+         | "A" elem -> box
          | var
          | "true" -> true
          | "false" -> false

@@ -29,18 +29,29 @@ class ToNNF(visitor.FormulaVisitor) :
                 self.result[str(not_exp)] = ast.Top()
             elif (isinstance(subform, ast.Not)) : # not case
                 #return ast.Not(not_exp.operand.accept(self)) 
-                self.result[str(not_exp)] = ast.Not(not_exp.operand.accept(self)) 
+                self.result[str(not_exp)] = subform.operand.accept(self) # !! p = p
+                #self.result[str(not_exp)] = ast.Not(not_exp.operand.accept(self)) 
             elif (isinstance(subform, ast.And)) : # and case
-                self.result[str(not_exp)] = ast.Or(subform.left.accept(self), subform.right.accept(self))
+                left = ast.Not(subform.left)
+                right = ast.Not(subform.right)
+                #self.result[str(not_exp)] = ast.Or(subform.left.accept(self), subform.right.accept(self))
+                self.result[str(not_exp)] = ast.Or(left.accept(self), right.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Or)) :   # or case
-                self.result[str(not_exp)] = ast.And(subform.left.accept(self), subform.right.accept(self))
+                left = ast.Not(subform.left)
+                right = ast.Not(subform.right)
+                self.result[str(not_exp)] = ast.And(left.accept(self), right.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Box)) :   # box case  
-                self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
+                operand = ast.Not(subform.left)
+                self.result[str(not_exp)] = ast.Diamond(operand.accept(self))
+                #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
+                #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Diamond)) :  #  diamond case
-                self.result[str(not_exp)] = ast.Box(subform.left.accept(self))
+                operand = ast.Not(subform.left)
+                self.result[str(not_exp)] = ast.Box(operand.accept(self))
+                #self.result[str(not_exp)] = ast.Box(subform.left.accept(self))
                 #return new_form
             return self.result[str(not_exp)]
         
