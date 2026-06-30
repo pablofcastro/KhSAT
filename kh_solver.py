@@ -12,7 +12,7 @@ import sys
 import time
 import itertools
 from functools import reduce # foldl
-sys.setrecursionlimit(100000)
+sys.setrecursionlimit(1000000)
 
 verbose = False # the tools shows more information hwne verbose is true
 start_time = 0 # to save the start_time for the sat
@@ -94,6 +94,8 @@ def translate_s5_optimized(problem) :
             final_form = astkh.And(first_and, second_and) # this is the final form
             final_form = astkh.And(final_form, third_and)
             final_form = astkh.And(final_form, fourth_and)
+
+            print(type(final_form))
             if (verbose) :
                 print("Formula checked: "+str(final_form))
                 print("D: "+str(D))

@@ -16,69 +16,69 @@ class ToNNF(visitor.FormulaVisitor) :
         return cons
     
     def visit_not(self, not_exp, info) :
-        if str(not_exp) in self.result :
-            return self.result[str(not_exp)] 
+        if id(not_exp) in self.result :
+            return self.result[id(not_exp)] 
         else :
             subform = not_exp.operand
             if (isinstance(subform, ast.Var)) : # var case
-                self.result[str(not_exp)] = not_exp
+                self.result[id(not_exp)] = not_exp
                 #return not_exp
             elif (isinstance(subform, ast.Top)) :
-                self.result[str(not_exp)] = ast.Bot()
+                self.result[id(not_exp)] = ast.Bot()
             elif (isinstance(subform, ast.Bot)) :
-                self.result[str(not_exp)] = ast.Top()
+                self.result[id(not_exp)] = ast.Top()
             elif (isinstance(subform, ast.Not)) : # not case
                 #return ast.Not(not_exp.operand.accept(self)) 
-                self.result[str(not_exp)] = subform.operand.accept(self) # !! p = p
+                self.result[id(not_exp)] = subform.operand.accept(self) # !! p = p
                 #self.result[str(not_exp)] = ast.Not(not_exp.operand.accept(self)) 
             elif (isinstance(subform, ast.And)) : # and case
                 left = ast.Not(subform.left)
                 right = ast.Not(subform.right)
                 #self.result[str(not_exp)] = ast.Or(subform.left.accept(self), subform.right.accept(self))
-                self.result[str(not_exp)] = ast.Or(left.accept(self), right.accept(self))
+                self.result[id(not_exp)] = ast.Or(left.accept(self), right.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Or)) :   # or case
                 left = ast.Not(subform.left)
                 right = ast.Not(subform.right)
-                self.result[str(not_exp)] = ast.And(left.accept(self), right.accept(self))
+                self.result[id(not_exp)] = ast.And(left.accept(self), right.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Box)) :   # box case  
                 operand = ast.Not(subform.left)
-                self.result[str(not_exp)] = ast.Diamond(operand.accept(self))
+                self.result[id(not_exp)] = ast.Diamond(operand.accept(self))
                 #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
                 #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Diamond)) :  #  diamond case
                 operand = ast.Not(subform.left)
-                self.result[str(not_exp)] = ast.Box(operand.accept(self))
+                self.result[id(not_exp)] = ast.Box(operand.accept(self))
                 #self.result[str(not_exp)] = ast.Box(subform.left.accept(self))
                 #return new_form
-            return self.result[str(not_exp)]
+            return self.result[id(not_exp)]
         
     def visit_and(self, and_exp, info) :
-        if str(and_exp) in self.result :
-            return self.result[str(and_exp)]
+        if id(and_exp) in self.result :
+            return self.result[id(and_exp)]
         else :
-            self.result[str(and_exp)] = ast.And(and_exp.left.accept(self), and_exp.right.accept(self))
-            return self.result[str(and_exp)]
+            self.result[id(and_exp)] = ast.And(and_exp.left.accept(self), and_exp.right.accept(self))
+            return self.result[id(and_exp)]
     
     def visit_or(self, or_exp, info) :
-        if str(or_exp) in self.result :
-            return self.result[str(or_exp)]
+        if id(or_exp) in self.result :
+            return self.result[id(or_exp)]
         else :
-            self.result[str(or_exp)] = ast.Or(or_exp.left.accept(self), or_exp.right.accept(self))
-            return self.result[str(or_exp)]
+            self.result[id(or_exp)] = ast.Or(or_exp.left.accept(self), or_exp.right.accept(self))
+            return self.result[id(or_exp)]
         
     def visit_box(self, box_exp, info) :
-        if str(box_exp) in self.result :
-            return self.result[str(box_exp)]
+        if id(box_exp) in self.result :
+            return self.result[id(box_exp)]
         else :
-            self.result[str(box_exp)] = ast.Box(box_exp.operand.accept(self))
-        return self.result[str(box_exp)]
+            self.result[id(box_exp)] = ast.Box(box_exp.operand.accept(self))
+        return self.result[id(box_exp)]
     
     def visit_diamond(self, diamond_exp, info) :
-        if str(diamond_exp) in self.result :
-            return self.result[str(diamond_exp)]
+        if id(diamond_exp) in self.result :
+            return self.result[id(diamond_exp)]
         else :
-            self.result[str(diamond_exp)] = ast.Diamond(diamond_exp.operand.accept(self))
-            return self.result[str(diamond_exp)]
+            self.result[id(diamond_exp)] = ast.Diamond(diamond_exp.operand.accept(self))
+            return self.result[id(diamond_exp)]

@@ -37,21 +37,21 @@ class ToSAT(visitor.FormulaVisitor) :
         return  Or([left, right])
 
     def visit_box(self, boxexp, info) :
-        if str(boxexp) in self.result  : # we save the result here to avoid computing twice
-            return self.result[str(boxexp)]
+        if id(boxexp) in self.result  : # we save the result here to avoid computing twice
+            return self.result[id(boxexp)]
         else :
             subform = boxexp.operand
             subforms = [ subform.accept(self, i+1) for i in range(self.size) ]
-            self.result[str(boxexp)] = And(subforms)
-            return self.result[str(boxexp)]
+            self.result[id(boxexp)] = And(subforms)
+            return self.result[id(boxexp)]
            
 
     def visit_diamond(self, diamondexp, info) :
-        if str(diamondexp) in self.result  :
-            return self.result[str(diamondexp)]
+        if id(diamondexp) in self.result  :
+            return self.result[id(diamondexp)]
         else :
             subform = diamondexp.operand
             subforms = [ subform.accept(self, i+1) for i in range(self.size) ]
-            self.result[str(diamondexp)] = Or(subforms)
-            return self.result[str(diamondexp)]
+            self.result[id(diamondexp)] = Or(subforms)
+            return self.result[id(diamondexp)]
     

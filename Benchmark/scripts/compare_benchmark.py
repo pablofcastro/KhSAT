@@ -12,12 +12,12 @@ def run_solver(instance_path, method):
     try:
         output_bytes = subprocess.run(
             [sys.executable, "../../kh_solver.py", "-f", instance_path, "-m", method], 
-            timeout=90, 
+            timeout=300, 
             capture_output=True
         ).stdout
         output = output_bytes.decode('utf-8', errors='ignore')
         
-        time_val = "900"
+        time_val = "300"
         result_val = "ERR"
         
         for line in output.splitlines():
@@ -30,10 +30,10 @@ def run_solver(instance_path, method):
                 
         return result_val, time_val
     except subprocess.TimeoutExpired:
-        return "TO", "90"
+        return "TO", "300"
     except Exception as e:
         print(f"Error running {instance_path} with method {method}: {e}")
-        return "ERR", "90"
+        return "ERR", "300"
 
 def process_batch(i, formulas_dir="../formulas/"):
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+).kh$")
@@ -83,12 +83,12 @@ def process_batch(i, formulas_dir="../formulas/"):
         try:
             t_new = float(time_new_str)
         except:
-            t_new = 900.0
+            t_new = 300.0
             
         try:
             t_old = float(time_old_str)
         except:
-            t_old = 900.0
+            t_old = 300.0
             
         if t_new < t_old:
             row["fastest"] = "new"
