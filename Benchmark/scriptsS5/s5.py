@@ -33,12 +33,12 @@ def clause(n,l,p):
 def phi(n ,m ,l ,p):
 
     """
-    Genera una fórmula S5 aleatoria en formato CNF usando el método New K-CNF.
+    Generate fórmula S5 random in CNF format using the New K-CNF method.
     
-    n: Número de variables proposicionales disponibles (N)
-    m: Número total de cláusulas (L en el paper)
-    L: Tamaño de cada cláusula (K)
-    P: Proporción de literales puramente proposicionales en cada cláusula (p)
+    n: Number of propositional variables available (N)
+    m: Total number of clauses (L in the paper)
+    L: Size of each clause (K)
+    P: Proportion of purely propositional literals in each clause (p)
     """
     
     r = ""
@@ -49,6 +49,3 @@ def phi(n ,m ,l ,p):
     
     return r[:-3]  
             
-    
-    
-    
