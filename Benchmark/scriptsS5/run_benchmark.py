@@ -48,6 +48,7 @@ def process_batch(i, runs) :
                 timed_out = True
         row["time"] = str(statistics.median(times)) if times else "900" # median execution time
         row["result"] = results[0] if results else ("TO" if timed_out else "TO")
+        row["size"] = os.path.getsize(instance_path) # formula length in bytes
         processed = processed + 1
         print(f"Progress: {round((processed/total_files) * 100,1)}%")
         result.append(row)
@@ -55,7 +56,7 @@ def process_batch(i, runs) :
     if result :
         fieldnames = result[0].keys()
     else :
-        fieldnames = ["form", "n", "m", "ratio", "p", "time", "result"]
+        fieldnames = ["form", "n", "m", "ratio", "p", "time", "result", "size"]
 
     # Write to CSV
     with open(f"output-batch{i}.csv", "w", newline="") as f:
