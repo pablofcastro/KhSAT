@@ -32,15 +32,19 @@ if __name__ == '__main__':
         p = 0.5
         # in this case, we generate the benchmark based on the relationship between clauses and the number of variables
         for i in range(2,benchmark_size) :
-            for j in range(10) :
-                # n = random.randint(1,i)
-                n = 15
-                m = int(n*j) # 4,3 is the threshold for 3-SAT problems, we can use it as a reference for S5 problems
-                fname = benchmark_path+f"formula{i}-{n}-{m}-{l}-{p}.s5"
-                print("Generating formula: "+fname)
-                ffile = open(fname,'w')
-                ffile.write(f"{s5.phi(n, m, l, p)}")
-                ffile.close()
+            n = 8
+            while n <= 16:
+                # j is the ratio of clauses to variables
+                j = 1
+                while j <= 15 :
+                    m = int(n*j) # 4,3 is the threshold for 3-SAT problems, we can use it as a reference for S5 problems
+                    fname = benchmark_path+f"formula{i}-{n}-{m}-{l}-{p}.s5"
+                    print("Generating formula: "+fname)
+                    ffile = open(fname,'w')
+                    ffile.write(f"{s5.phi(n, m, l, p)}")
+                    ffile.close()
+                    j+=(0.5)
+                n+=4
     else:
         print(f'error: incorrect number of arguments.')
         print(f'  use: {argv[0]} | -benchmark')
