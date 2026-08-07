@@ -7,6 +7,8 @@ from z3 import *
 import sys
 import time
 
+sys.setrecursionlimit(10000)
+
 verbose = False
 
 def validate_file(f):
@@ -34,7 +36,7 @@ def get_model(parsed_form) :
     return s
 
 def satS5(formula) :
-    start_time = time.perf_counter()
+    #start_time = time.perf_counter()
     # a nnf visitor is created
     nnf_visitor = tonnf.ToNNF()
     # a diamond visitor is created
@@ -56,8 +58,15 @@ def satS5(formula) :
 
     s = Solver()
     s.add(boolean_form)
+    
+    # -------- INICIO DE LA MEDICIÓN REAL --------
+    start_time = time.perf_counter()
+    
     result = s.check()
+    
     end_time = time.perf_counter()
+    # -------- FIN DE LA MEDICIÓN REAL --------
+    
     if result == sat :
         print("The formula is SAT.")
         print("Model:")
