@@ -103,14 +103,14 @@ if __name__ == "__main__" :
     parser.add_argument(
         "--batch",
         type=int,
-        default=10,
+        default=3,
         help="The batch to be processed: 1,2,3,4,5"
     )
 
     parser.add_argument(
         "--all",
-        type=bool,
-        default=None,
+        action="store_true",
+        default=False,
         help="Option to process all the batches"
     )
 

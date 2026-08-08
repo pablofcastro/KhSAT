@@ -76,8 +76,8 @@ if __name__ == "__main__" :
 
     parser.add_argument(
         "--all",
-        type=bool,
-        default=None,
+        action="store_true",
+        default=False,
         help="Option to process all the batches"
     )
 
