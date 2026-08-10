@@ -268,4 +268,55 @@ if "time_per_size" in df.columns:
               "revealing the difficulty due to structural complexity only.")
     plt.legend()
 
+# ===================================================================
+# G8: Worlds vs Time (log-log scatter + median per n + power-law fit)
+# ===================================================================
+g8_df = df[df["result"] != "TO"].copy()
+g8_df["n"] = pd.to_numeric(g8_df["n"], errors="coerce")
+g8_df["time"] = pd.to_numeric(g8_df["time"], errors="coerce")
+g8_df["worlds"] = pd.to_numeric(g8_df["worlds"], errors="coerce")
+g8_df = g8_df.dropna(subset=["n", "time", "worlds"])
+g8_df = g8_df[g8_df["time"] > 0]
+
+if g8_df.empty:
+    print("Warning: G8 skipped: no rows with valid 'worlds' and 'time'.")
+else:
+    plt.figure()
+    ns = sorted(g8_df["n"].unique())
+    n_to_color = {n: COLORS[idx % len(COLORS)] for idx, n in enumerate(ns)}
+
+    # Log-log scatter, points colored by n (distinct categorical colors)
+    plt.scatter(g8_df["worlds"], g8_df["time"], c=g8_df["n"].map(n_to_color),
+                s=10, alpha=0.55)
+
+    # Median time per worlds-quantile bucket, one curve per n
+    for idx, n in enumerate(ns):
+        ndf = g8_df[g8_df["n"] == n]
+        bdf = ndf.assign(wbucket=pd.qcut(ndf["worlds"], q=8, duplicates="drop"))
+        med = bdf.groupby("wbucket", observed=True)["time"].median()
+        mids = [i.mid for i in med.index]
+        plt.plot(mids, med.values,
+                 color=n_to_color[n], linestyle=LINESTYLES[idx % len(LINESTYLES)],
+                 marker=MARKERS[idx % len(MARKERS)], label=f"median n={n}")
+
+    # Power-law fit: log(time) = alpha*log(worlds) + c
+    X = np.log(g8_df["worlds"].to_numpy())
+    Y = np.log(g8_df["time"].to_numpy())
+    alpha, c = np.polyfit(X, Y, 1)
+    pred = alpha * X + c
+    ss_res = float(((Y - pred) ** 2).sum())
+    ss_tot = float(((Y - Y.mean()) ** 2).sum())
+    r2 = 1 - ss_res / ss_tot
+    print(f"G8 power-law fit: time = C * worlds^alpha, alpha = {alpha:.3f}, "
+          f"C = {np.exp(c):.3e}, R^2 = {r2:.3f}")
+
+    plt.xlabel("Worlds")
+    plt.ylabel("Execution time (s)")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.title("G8: Worlds vs Time (log-log)\n"
+              "Points colored by n. Lines: median time per worlds bucket per n. "
+              "Slope of the fit = scaling exponent alpha.")
+    plt.legend()
+
 plt.show()
