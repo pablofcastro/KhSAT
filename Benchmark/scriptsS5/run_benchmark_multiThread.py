@@ -7,6 +7,22 @@ import re
 import statistics
 import concurrent.futures
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
+import S5.DiamondVisitor as diamond_counter
+import S5.parser_s5 as s5parser
+
+def count_worlds(instance_path):
+    sys.setrecursionlimit(10000)
+    try:
+        with open(instance_path, "r") as f:
+            text = f.read()
+        parsed = s5parser.parse(text)
+        n = parsed.accept(diamond_counter.DiamondVisitor())
+        return n + 1
+    except Exception as e:
+        print(f"Warning: could not compute worlds for {instance_path}: {e}")
+        return ""
+
 def process_single_file(file, runs):
     """Esta función procesa una sola fórmula. Será ejecutada en paralelo por los distintos núcleos."""
     row = {}
@@ -18,6 +34,7 @@ def process_single_file(file, runs):
     row["p"] = instance[4] # diamond degree parameter
     
     instance_path = os.path.join("../formulasS5/", file)
+    row["worlds"] = count_worlds(instance_path)
     
     times = []
     results = []
@@ -89,7 +106,7 @@ def process_batch(batch_num, runs) :
     if result :
         fieldnames = result[0].keys()
     else :
-        fieldnames = ["form", "n", "m", "ratio", "p", "time", "result", "size"]
+        fieldnames = ["form", "n", "m", "ratio", "p", "worlds", "time", "result", "size"]
 
     # Write to CSV
     with open(f"output-batch{batch_num}.csv", "w", newline="") as f:
