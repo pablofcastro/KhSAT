@@ -2,7 +2,7 @@ import random
 
 diamonds_generated = 0
 # W = MAX_DIAMONS + 1
-MAX_DIAMONDS = 3 
+MAX_DIAMONDS = 100000000
 
 def random_var(n):
     return f"p{random.randint(0,n-1)}"
