@@ -151,18 +151,18 @@ plt.title("G4: Time vs ratio by n and result\n"
 plt.legend()
 
 # ===================================================================
-# G5: Heatmap ratio x p (diamond degree), one subplot per n
+# G5: Heatmap ratio x pd (Probabilidad de Diamante), one subplot per n
 # ===================================================================
-if "p" in df.columns:
-    if len(sorted(df["p"].unique())) < 2 or df["ratio"].nunique() < 2:
-        print("Warning: G5 (heatmap) skipped: a heatmap needs at least 2 distinct p values "
+if "pd" in df.columns:
+    if len(sorted(df["pd"].unique())) < 2 or df["ratio"].nunique() < 2:
+        print("Warning: G5 (heatmap) skipped: a heatmap needs at least 2 distinct pd values "
               "and 2 distinct ratios to be drawn.")
     else:
         pivots = []
         for n in n_values:
             n_df = df[df["n"] == n]
             decided = n_df[n_df["result"] != "TO"]
-            pivots.append(decided.pivot_table(index="ratio", columns="p", values="time", aggfunc="median"))
+            pivots.append(decided.pivot_table(index="ratio", columns="pd", values="time", aggfunc="median"))
         valid = [pv.values for pv in pivots if pv.size]
         vmin = min(v[~np.isnan(v)].min() for v in valid) if valid else 0
         vmax = max(v[~np.isnan(v)].max() for v in valid) if valid else 1
@@ -188,14 +188,13 @@ if "p" in df.columns:
                 ax.axhline(threshold, color="red", linestyle="--", linewidth=1,
                            label=f"n={n} threshold = {threshold:.3f}")
             ax.set_title(f"n={n}")
-            ax.set_xlabel("p (diamond degree)")
+            ax.set_xlabel("pd (Probabilidad de Diamante)")
             ax.set_ylabel("Ratio (M/N)")
             ax.legend()
         if im is not None:
             fig.colorbar(im, ax=axes, label="Median time (s)")
-        fig.suptitle("G5: Heatmap ratio x p - median time per n\n"
-                     "Shows how difficulty changes with the diamond degree p. The red line is the critical threshold.")
-
+        fig.suptitle("G5: Heatmap ratio x pd - median time per n\n"
+                     "Shows how difficulty changes with the diamond proportion pd. The red line is the critical threshold.")
 # ===================================================================
 # G6: Grouped boxplot of times per ratio and n
 # ===================================================================
@@ -267,5 +266,96 @@ if "time_per_size" in df.columns:
               "Median time divided by formula length. Removes the effect of longer formulas, "
               "revealing the difficulty due to structural complexity only.")
     plt.legend()
+
+
+# ===================================================================
+# G8: Evolución Estructural (Cajas y Diamantes vs. Ratio M/N)
+# ===================================================================
+if "boxes" in df.columns and "diamonds" in df.columns:
+    plt.figure()
+    for idx, n in enumerate(n_values):
+        st = style_for(idx)
+        n_df = df[df["n"] == n]
+        decided = n_df[n_df["result"] != "TO"]
+        
+        # Promedio de cajas y diamantes por ratio
+        med_boxes = decided.groupby("ratio")["boxes"].median().sort_index()
+        med_diamonds = decided.groupby("ratio")["diamonds"].median().sort_index()
+
+        plt.plot(med_boxes.index, med_boxes.values, marker=st["marker"], linestyle="-",
+                 color=st["color"], label=f"Cajas (A) n={n}")
+        plt.plot(med_diamonds.index, med_diamonds.values, marker="x", linestyle=":",
+                 color=st["color"], alpha=0.7, label=f"Diamantes (E) n={n}")
+
+    plt.xlabel("Ratio (M/N)")
+    plt.ylabel("Cantidad Mediana de Operadores")
+    plt.title("G8: Crecimiento de Cajas (A) vs Diamantes (E)\n"
+              "Muestra la saturación de mundos (E) y el crecimiento lineal de restricciones (A).")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+# ===================================================================
+# G9: Tiempo vs Relación Modal (Cajas / Diamantes)
+# ===================================================================
+if "modal_ratio" in df.columns:
+    plt.figure()
+    for idx, n in enumerate(n_values):
+        st = style_for(idx)
+        n_df = df[df["n"] == n]
+        decided = n_df[n_df["result"] != "TO"]
+        
+        # Agrupamos por ratio de variables para suavizar la dispersión
+        grouped = decided.groupby("ratio").agg({"modal_ratio": "median", "time": "median"}).sort_values("modal_ratio")
+        
+        plt.plot(grouped["modal_ratio"], grouped["time"], marker=st["marker"], linestyle=st["linestyle"],
+                 color=st["color"], label=f"n={n}")
+
+    plt.xlabel("Modal Ratio (Total Cajas / Total Diamantes)")
+    plt.ylabel("Execution time (s)")
+    plt.yscale("log")
+    plt.title("G9: Dificultad basada en la dominancia de Cajas\n"
+              "Muestra cómo el tiempo explota cuando hay una proporción específica de restricciones por mundo.")
+    plt.legend()
+    
+
+# ===================================================================
+# G10: Impacto de la Proporción Modal en la Dificultad (PD vs Tiempo)
+# ===================================================================
+if "pd" in df.columns:
+    plt.figure()
+    
+    # Elegimos el 'n' más grande que tengas para ver el efecto con mayor claridad
+    n_target = max(n_values)
+    n_df = df[df["n"] == n_target]
+    decided = n_df[n_df["result"] != "TO"]
+    
+    # Detectamos qué probabilidades de diamantes (pd) corriste
+    pd_values_present = sorted(decided["pd"].unique())
+    
+    for idx, pd_val in enumerate(pd_values_present):
+        st = style_for(idx)
+        sub_df = decided[decided["pd"] == pd_val]
+        
+        # Calculamos la mediana de tiempo para cada ratio
+        med = sub_df.groupby("ratio")["time"].median().sort_index()
+        
+        # Etiqueta clara para el profesor
+        if pd_val < 0.5:
+            lbl = f"Muchas Cajas (pd={pd_val})"
+        elif pd_val > 0.5:
+            lbl = f"Muchos Diamantes (pd={pd_val})"
+        else:
+            lbl = f"Balanceado (pd={pd_val})"
+            
+        plt.plot(med.index, med.values, marker=st["marker"], linestyle=st["linestyle"],
+                 color=st["color"], label=lbl)
+
+    plt.xlabel("Ratio (M/N)")
+    plt.ylabel("Execution time (s)")
+    plt.yscale("log")
+    plt.title(f"G10: Impacto de Cajas vs Diamantes en la Dificultad (n={n_target})\n"
+              "Muestra cómo el exceso de Cajas o Diamantes altera la campana de transición de fase.")
+    plt.legend()
+    plt.tight_layout()
 
 plt.show()

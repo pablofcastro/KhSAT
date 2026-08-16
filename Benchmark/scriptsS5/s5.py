@@ -2,12 +2,12 @@ import random
 
 diamonds_generated = 0
 # W = MAX_DIAMONS + 1
-MAX_DIAMONDS = 3 
+MAX_DIAMONDS = 3000000000000000
 
 def random_var(n):
     return f"p{random.randint(0,n-1)}"
 
-def literal(n, p):
+def literal(n, p, pd):
     global diamonds_generated
     lit = random_var(n)
 
@@ -17,30 +17,29 @@ def literal(n, p):
     if random.random() < p:
 
         if diamonds_generated < MAX_DIAMONDS:
-            op = random.choice(["A", "E"])
-            if op == "E":
+            if random.random() < pd:
+                op = "E"
                 diamonds_generated += 1
+            else:
+                op = "A"
         else:
             op = "A"
-            
         lit = f"{op} {lit}"
-        
 
-        
     return lit
  
-def clause(n,l,p):
+def clause(n,l,p,pd):
     
     r = "("
     
     for _ in range(l):
     
-        r += literal(n,p) + " | "
+        r += literal(n,p,pd) + " | "
     
     return r[:-3] + ")" 
     
 
-def phi(n ,m ,l ,p):
+def phi(n ,m ,l ,p,pd):
 
     """
     Generate fórmula S5 random in CNF format using the New K-CNF method.
@@ -49,6 +48,7 @@ def phi(n ,m ,l ,p):
     m: Total number of clauses (L in the paper)
     L: Size of each clause (K)
     P: Proportion of purely propositional literals in each clause (p)
+    pd: Proportion between Box and diamond operator
     """
     
     global diamonds_generated
@@ -59,7 +59,7 @@ def phi(n ,m ,l ,p):
 
     for _ in range(m):
         
-        r+= clause(n,l,p) + " & "
+        r+= clause(n,l,p,pd) + " & "
     
     return r[:-3]  
             

@@ -2,7 +2,7 @@ import sys
 import random
 import s5
 
-benchmark_size = 36
+benchmark_size = 20
 benchmark_instance = 0
 benchmark_path = "../formulasS5/"
 
@@ -32,21 +32,19 @@ if __name__ == '__main__':
         p = 0.5
         # in this case, we generate the benchmark based on the relationship between clauses and the number of variables
         
-        n_values = [60, 80, 100, 120]
-        
+        n_values = [100,120]
+        pd_values = [0.2, 0.45,0.5,0.55, 0.8]
         for i in range(2,benchmark_size) :
-            
-            for n in n_values:
-                # j is the ratio of clauses to variables
-                j = 1
-                while j <= 15.0 :
-                    m = int(n*j) # 4,3 is the threshold for 3-SAT problems, we can use it as a reference for S5 problems
-                    fname = benchmark_path+f"formula{i}-{n}-{m}-{l}-{p}.s5"
-                    print("Generating formula: "+fname)
-                    ffile = open(fname,'w')
-                    ffile.write(f"{s5.phi(n, m, l, p)}")
-                    ffile.close()
-                    j+=(0.5)
+            for n in n_values:                
+                for pd in pd_values:
+                    ratios = [2.0, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 11.0, 12.0, 15.0]
+                    
+                    for j in ratios:
+                        m = int(n * j) 
+                        fname = benchmark_path + f"formula{i}-{n}-{m}-{l}-{p}-{pd}.s5"
+                        print(f"Generating: {fname} | Ratio: {j}")
+                        with open(fname, 'w') as ffile:
+                            ffile.write(f"{s5.phi(n, m, l, p, pd)}")
     else:
         print(f'error: incorrect number of arguments.')
         print(f'  use: {argv[0]} | -benchmark')
