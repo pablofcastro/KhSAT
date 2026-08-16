@@ -6,6 +6,22 @@ import argparse
 import re
 import statistics
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
+import S5.DiamondVisitor as diamond_counter
+import S5.parser_s5 as s5parser
+
+def count_worlds(instance_path):
+    sys.setrecursionlimit(10000)
+    try:
+        with open(instance_path, "r") as f:
+            text = f.read()
+        parsed = s5parser.parse(text)
+        n = parsed.accept(diamond_counter.DiamondVisitor())
+        return n + 1
+    except Exception as e:
+        print(f"Warning: could not compute worlds for {instance_path}: {e}")
+        return ""
+
 def process_batch(i, runs) :
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+)-(\d+)-([\d.]+).s5$")
     files = []
@@ -30,6 +46,7 @@ def process_batch(i, runs) :
         row["ratio"] = round(int(instance[2])/int(instance[1]), 2) # clauses per variable
         row["p"] = instance[4] # diamond degree parameter
         instance_path = os.path.join(f"../formulasS5/", file)
+        row["worlds"] = count_worlds(instance_path)
         print(f"Running: python s5_solver.py -f {instance_path}")
         times = []
         results = []
@@ -56,7 +73,7 @@ def process_batch(i, runs) :
     if result :
         fieldnames = result[0].keys()
     else :
-        fieldnames = ["form", "n", "m", "ratio", "p", "time", "result", "size"]
+        fieldnames = ["form", "n", "m", "ratio", "p", "worlds", "time", "result", "size"]
 
     # Write to CSV
     with open(f"output-batch{i}.csv", "w", newline="") as f:

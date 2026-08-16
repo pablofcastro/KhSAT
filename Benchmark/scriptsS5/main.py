@@ -1,5 +1,6 @@
 import sys
 import random
+import os
 import s5
 
 benchmark_size = 20
@@ -29,7 +30,6 @@ if __name__ == '__main__':
 
     elif len(argv) == 1 and argv[0] == "-benchmark" :
         l = 3
-        p = 0.5
         # in this case, we generate the benchmark based on the relationship between clauses and the number of variables
         
         n_values = [100,120]
