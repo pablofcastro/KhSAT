@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 # ---- Load multiple CSV files ----
-file_list = ["output-batch1-Vale.csv", "output-batch2-Vale.csv", "output-batch3.csv", "output-batch4.csv", "output-batch5.csv"]
+file_list = ["output-batch1.csv", "output-batch2.csv", "output-batch3.csv", "output-batch4.csv", "output-batch5.csv"]
 
 dfs = []
 for f in file_list:
@@ -641,54 +641,73 @@ if "modal_ratio" in df.columns:
 else:
     print("Warning: G14 skipped. No se encontró la columna 'modal_ratio'.")
     
-
 # ===================================================================
-# G15: Gráfico 3D (Ratio vs Relación Diamantes/Cajas vs Tiempo)
+# G15_Lineas: Gráfico 3D (Ratio vs Relación Diamantes/Cajas vs Tiempo)
 # ===================================================================
 if "diamonds" in df.columns and "boxes" in df.columns:
     # Importamos explicitamente la proyección 3D
     from mpl_toolkits.mplot3d import Axes3D 
     import numpy as np
+    import matplotlib.cm as cm
     
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
     
     # 1. Filtramos: quitamos Timeouts y tomamos el 'n' más grande
     n_target = max(n_values)
     df_3d = df[(df["n"] == n_target) & (df["result"] != "TO")].copy()
     
-    # Calculamos la nueva relación: Diamantes / Cajas. 
-    # Reemplazamos 0 cajas por NaN para evitar divisiones por cero (Infinito) que rompen el gráfico 3D
+    # Calculamos Diamantes / Cajas
     df_3d["diam_box_ratio"] = df_3d["diamonds"] / df_3d["boxes"].replace(0, np.nan)
-    
-    # Limpiamos las posibles filas con NaN resultantes
     df_3d = df_3d.dropna(subset=["diam_box_ratio", "time", "ratio"])
     
-    # 2. Extraemos las coordenadas
-    x = df_3d["ratio"]
-    y = df_3d["diam_box_ratio"]
-    z = df_3d["time"]
+    # 2. Agrupamos por la relación modal.
+    # Redondeamos a 1 decimal para juntar las fórmulas que corresponden al mismo 
+    # salto de tu generador (0.5, 1.0, 1.5, etc.)
+    df_3d["y_group"] = df_3d["diam_box_ratio"].round(1)
     
-    # 3. Dibujamos el Scatter 3D. 
-    sc = ax.scatter(x, y, z, c=z, cmap='coolwarm', marker='o', s=30, alpha=0.8, edgecolors='k', linewidth=0.2)
+    y_unique = sorted(df_3d["y_group"].unique())
+    max_time_global = df_3d["time"].max()
     
+    # Usamos un mapa de colores (azul a rojo)
+    # Usamos un mapa de colores (azul a rojo)
+    cmap = plt.get_cmap('coolwarm')
+    
+    # 3. Dibujamos una LÍNEA por cada nivel de asimetría modal
+    for y_val in y_unique:
+        sub_df = df_3d[df_3d["y_group"] == y_val]
+        
+        # Obtenemos la curva de dificultad para este valor específico de Diam/Cajas
+        grouped = sub_df.groupby("ratio")["time"].median().sort_index()
+        
+        # Solo dibujamos si hay al menos 2 puntos para trazar una línea
+        if len(grouped) > 1:
+            xs = grouped.index.to_numpy()
+            zs = grouped.values
+            ys = np.full_like(xs, y_val)
+            
+            # Calculamos el color de la línea basado en qué tan alto llega su pico de dificultad
+            # Las líneas que lleguen más alto serán más rojas; las planas, azules.
+            color_val = cmap(zs.max() / max_time_global)
+            
+            # Dibujamos la línea 3D gruesa
+            ax.plot(xs, ys, zs, color=color_val, linewidth=3, alpha=0.8, zorder=3)
+            
+            # Agregamos los puntos sobre la línea para marcar exactamente qué ratios probaste
+            ax.scatter(xs, ys, zs, color=color_val, s=25, edgecolors='white', linewidth=0.5, zorder=4)
+
     # 4. Etiquetas y diseño
-    ax.set_xlabel('Ratio (M/N)')
-    ax.set_ylabel('Dominancia Modal (Diamantes / Cajas)')
-    ax.set_zlabel('Tiempo de Ejecución (s)')
+    ax.set_xlabel('Ratio (M/N)', labelpad=10)
+    ax.set_ylabel('Dominancia Modal (Diamantes / Cajas)', labelpad=10)
+    ax.set_zlabel('Tiempo de Ejecución Mediano (s)', labelpad=10)
     
     ax.set_title(f"G15: La Montaña de Dificultad S5 (n={n_target})\n"
-                 "Efecto de la Dominancia de Diamantes sobre la Densidad Proposicional")
+                 "Curvas de transición de fase separadas por relación Diamantes/Cajas")
     
-    # Barra de color de referencia
-    cbar = fig.colorbar(sc, ax=ax, shrink=0.5, aspect=10, pad=0.1)
-    cbar.set_label('Tiempo de Ejecución (s)')
-    
-    # Ajustamos el ángulo de visión inicial (Elevación, Azimut)
-    ax.view_init(elev=30, azim=135)
+    # Ajustamos el ángulo de visión para ver bien las crestas de la montaña
+    ax.view_init(elev=25, azim=135)
     
     plt.tight_layout()
-    plt.show()
 else:
     print("Warning: G15 skipped. Faltan las columnas 'diamonds' o 'boxes' en el CSV.")
 # ===================================================================
