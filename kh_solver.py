@@ -4,6 +4,7 @@ the input of the solver is a sequence of negated or basic modal formulas, for in
 kh(p,q);kh(s,t);~kh(x,y)
 """
 import argparse, os
+from kh_solver_matrix import solver
 import Kh.parser_kh as khparser
 import Kh.AST_kh as astkh
 import s5_solver as s5solver
@@ -391,7 +392,7 @@ if __name__ == "__main__" :
     parser.add_argument("-f", "--file", dest="file", type=validate_file,
                         help="the file with the formula", metavar="FILE")
     parser.add_argument("-i", "--inline", dest="form", help="takes a formula as inline input", metavar="FORMULA")
-    parser.add_argument("-m", "--method", dest="method", choices=["new", "old"], default="new", help="choose the translation method")
+    parser.add_argument("-m", "--method", dest="method", choices=["new", "old", "pseu"], default="new", help="choose the translation method")
     args = parser.parse_args()
     
     if args.verbose :
@@ -401,8 +402,10 @@ if __name__ == "__main__" :
         parsed_form = khparser.parse(problem)
         if args.method == "new":
             translate_s5_optimized_lu(parsed_form)
-        else:
+        elif args.method == "old":
             translate_s5_optimized(parsed_form)
+        elif args.method == "pseu":
+            solver(parsed_form)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
@@ -410,8 +413,10 @@ if __name__ == "__main__" :
             parsed_form = khparser.parse(problem)
             if args.method == "new":
                 translate_s5_optimized_lu(parsed_form)
-            else:
+            elif args.method == "old":
                 translate_s5_optimized(parsed_form)
+            elif args.method == "pseu":
+                solver(parsed_form)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
