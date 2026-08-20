@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 # ---- Load multiple CSV files ----
-file_list = ["output-batch1.csv", "output-batch2.csv", "output-batch3.csv", "output-batch4.csv", "output-batch5.csv"]
+file_list = ["output-batch1-Vale.csv", "output-batch2-Vale.csv", "output-batch3.csv", "output-batch4.csv", "output-batch5.csv"]
 
 dfs = []
 for f in file_list:
@@ -357,8 +357,6 @@ if "pd" in df.columns:
     plt.legend()
     plt.tight_layout()
 
-plt.show()
-
 # ===================================================================
 # G11: Worlds vs Time (log-log scatter + median per n + power-law fit)
 # ===================================================================
@@ -409,5 +407,347 @@ else:
               "Points colored by n. Lines: median time per worlds bucket per n. "
               "Slope of the fit = scaling exponent alpha.")
     plt.legend()
+
+# ===================================================================
+# G12: La Campana de Dificultad separada por Rangos de Mundos (Buckets)
+# ===================================================================
+if "worlds" in df.columns:
+    plt.figure()
+    
+    # Tomamos solo el 'n' más grande para que el gráfico sea claro
+    n_target = max(n_values)
+    n_df = df[df["n"] == n_target]
+    
+    # Usamos .copy() para evitar warnings de Pandas al crear nuevas columnas
+    decided = n_df[n_df["result"] != "TO"].copy() 
+    
+    # 1. Definimos los "Buckets" (Rangos) de mundos. 
+    # Ajusta estos números si generaste fórmulas mucho más grandes.
+    bins = [0, 50, 150, 350, 600, 1000, float('inf')]
+    labels = ["<50", "50-150", "150-350", "350-600", "600-1000", ">1000"]
+    
+    # Asignamos cada fórmula a su rango correspondiente
+    decided["w_bucket"] = pd.cut(decided["worlds"], bins=bins, labels=labels)
+    
+    # 2. Filtramos solo los rangos que realmente tienen datos en tus CSVs
+    active_buckets = decided["w_bucket"].dropna().unique()
+    active_buckets = sorted(active_buckets, key=lambda x: labels.index(x))
+    
+    for idx, bucket in enumerate(active_buckets):
+        st = style_for(idx)
+        # Filtramos las fórmulas de este bucket específico
+        sub_df = decided[decided["w_bucket"] == bucket]
+        
+        if sub_df.empty: 
+            continue
+            
+        # 3. Calculamos la mediana agrupando TODAS las fórmulas del bucket por Ratio
+        med = sub_df.groupby("ratio")["time"].median().sort_index()
+        
+        # Solo graficamos si hay suficientes puntos para hacer una línea decente
+        if len(med) > 2:
+            plt.plot(med.index, med.values, marker=st["marker"], linestyle=st["linestyle"],
+                     color=st["color"], label=f"Mundos: {bucket}")
+
+    plt.xlabel("Ratio (M/N)")
+    plt.ylabel("Tiempo de Ejecución Mediano (s)")
+    plt.yscale("log")
+    plt.title(f"G12: Transición de Fase por Rangos de Mundos (N={n_target})\n"
+              "Agrupando fórmulas en buckets para suavizar la curva de dificultad.")
+    plt.legend()
+    plt.tight_layout()
+else:
+    print("Warning: G12 skipped. No se encontró la columna 'worlds'.")
+    
+    
+    
+# ===================================================================
+# G1_DESGLOSADO: Transición de Fase P(SAT) y Thresholds separados
+# por 'n' Y por la variable secundaria (Mundos o pd)
+# ===================================================================
+
+# 1. Filtramos instancias no resueltas (TO)
+df_clean = df[df["result"] != "TO"].copy()
+
+# 2. SELECCIÓN DE VARIABLE SECUNDARIA A AISLAR:
+# Descomenta la opción que quieras analizar:
+
+# OPCIÓN A: Agrupar por Rangos de Mundos (Buckets)
+if "worlds" in df_clean.columns:
+    bins = [0, 50, 150, 350, 600, 1000, float('inf')]
+    labels = ["<50", "50-150", "150-350", "350-600", "600-1000", ">1000"]
+    df_clean["var_sec"] = pd.cut(df_clean["worlds"], bins=bins, labels=labels)
+    nombre_var = "Mundos"
+# OPCIÓN B: Agrupar por parámetro pd (Proporción Cajas/Diamantes)
+elif "pd" in df_clean.columns:
+    df_clean["var_sec"] = df_clean["pd"]
+    nombre_var = "pd"
+else:
+    df_clean["var_sec"] = "Grupo Único"
+    nombre_var = "Grupo"
+
+# 3. Creación del gráfico con un subplot por cada 'n'
+ncols = len(n_values)
+fig, axes = plt.subplots(1, ncols, figsize=(7 * ncols, 5), squeeze=False)
+axes = axes[0]
+
+print("\n=== THRESHOLDS CRÍTICOS INTERPOLADOS P(SAT) = 0.5 ===")
+
+for idx_n, n in enumerate(n_values):
+    ax = axes[idx_n]
+    n_df = df_clean[df_clean["n"] == n]
+    
+    # Línea horizontal de referencia P(SAT) = 0.5
+    ax.axhline(0.5, color="black", linestyle="--", linewidth=1, alpha=0.7, label="P(SAT) = 0.5")
+    
+    # Obtenemos los subgrupos presentes en este 'n'
+    sec_values = [v for v in n_df["var_sec"].dropna().unique()]
+    sec_values = sorted(sec_values, key=lambda x: str(x))
+    
+    for idx_sec, sec_val in enumerate(sec_values):
+        sub_df = n_df[n_df["var_sec"] == sec_val]
+        
+        # P(SAT) individualizado por Ratio
+        frac = sub_df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
+        
+        if len(frac) < 2:
+            continue
+            
+        # Interpolación matemática del threshold para este subgrupo exacto
+        threshold = interpolate_threshold(frac)
+        st = style_for(idx_sec)
+        
+        lbl_curva = f"{nombre_var}: {sec_val}"
+        ax.plot(frac.index, frac.values, marker=st["marker"], linestyle=st["linestyle"],
+                color=st["color"], label=lbl_curva)
+        
+        # Dibuja la línea vertical del threshold individualizado
+        if threshold is not None:
+            print(f"n={n} | {nombre_var}={sec_val} -> Threshold en Ratio = {threshold:.3f}")
+            ax.axvline(threshold, color=st["color"], linestyle=":", linewidth=1.5, alpha=0.85,
+                       label=f"Thresh ({sec_val}) = {threshold:.2f}")
+
+    ax.set_xlabel("Ratio (M/N)")
+    ax.set_ylabel("P(SAT)")
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_title(f"Transición de Fase para n = {n}")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend(fontsize="small", loc="best")
+
+fig.suptitle(f"Transición de Fase P(SAT) y Thresholds Desglosados por n y {nombre_var}\n"
+             f"(Las líneas punteadas verticales representan el threshold individual P(SAT)=0.5)",
+             fontsize=12)
+plt.tight_layout()
+
+# ===================================================================
+# G13: Campana de Dificultad (Mundos fijos 350-600) separada por CAJAS
+# ===================================================================
+if "worlds" in df.columns and "boxes" in df.columns:
+    plt.figure()
+    
+    # Tomamos el 'n' más grande para mayor claridad en los tiempos
+    n_target = max(n_values)
+    
+    # 1. FILTRO MAESTRO: Solo 'n' máximo, sin Timeouts, y MUNDOS entre 350 y 600
+    df_g13 = df[(df["n"] == n_target) & 
+                (df["result"] != "TO") & 
+                (df["worlds"] >= 350) & 
+                (df["worlds"] <= 600)].copy()
+    
+    if df_g13.empty:
+        print(f"Warning: No hay datos suficientes para n={n_target} con mundos entre 350 y 600.")
+    else:
+        # 2. Definimos los "Buckets" (Rangos) para las CAJAS (A)
+        # NOTA: Puedes ajustar estos límites numéricos si tus cajas reales 
+        # son mucho mayores o menores en los CSVs.
+        bins_boxes = [0, 100, 300, 600, 1000, float('inf')]
+        labels_boxes = ["<100", "100-300", "300-600", "600-1000", ">1000"]
+        
+        # Asignamos cada fórmula a su rango de cajas correspondiente
+        df_g13["box_bucket"] = pd.cut(df_g13["boxes"], bins=bins_boxes, labels=labels_boxes)
+        
+        # Obtenemos solo los buckets que realmente tengan fórmulas adentro
+        active_box_buckets = df_g13["box_bucket"].dropna().unique()
+        active_box_buckets = sorted(active_box_buckets, key=lambda x: labels_boxes.index(x))
+        
+        for idx, bucket in enumerate(active_box_buckets):
+            st = style_for(idx)
+            
+            # Filtramos las fórmulas que caen en este rango de cajas
+            sub_df = df_g13[df_g13["box_bucket"] == bucket]
+            
+            if sub_df.empty: 
+                continue
+                
+            # Calculamos la mediana de tiempo agrupando por Ratio
+            med = sub_df.groupby("ratio")["time"].median().sort_index()
+            
+            # Graficamos solo si hay al menos 3 puntos para formar una curva
+            if len(med) > 2:
+                plt.plot(med.index, med.values, marker=st["marker"], linestyle=st["linestyle"],
+                         color=st["color"], label=f"Cajas (A): {bucket}")
+
+        plt.xlabel("Ratio (M/N)")
+        plt.ylabel("Tiempo de Ejecución Mediano (s)")
+        plt.yscale("log")
+        plt.title(f"G13: Impacto de Cajas con Mundos constantes (350-600) (n={n_target})\n"
+                  "Demuestra si asfixiar un universo de tamaño fijo facilita el problema.")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+else:
+    print("Warning: G13 skipped. Faltan las columnas 'worlds' o 'boxes' en tu CSV.")
+
+# ===================================================================
+# G14: Gráfico 3D (Ratio vs Relación Modal vs Tiempo)
+# ===================================================================
+if "modal_ratio" in df.columns:
+    # Importamos explicitamente la proyección 3D (necesario en algunas versiones de matplotlib)
+    from mpl_toolkits.mplot3d import Axes3D 
+    
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # 1. Filtramos: quitamos Timeouts y tomamos el 'n' más grande para ver el pico claro
+    n_target = max(n_values)
+    df_3d = df[(df["n"] == n_target) & (df["result"] != "TO")].copy()
+    
+    # 2. Extraemos las coordenadas
+    x = df_3d["ratio"]
+    y = df_3d["modal_ratio"]
+    z = df_3d["time"]
+    
+    # 3. Dibujamos el Scatter 3D. 
+    # Usamos 'c=z' para que el color represente el tiempo (azul = rápido, rojo = lento)
+    sc = ax.scatter(x, y, z, c=z, cmap='coolwarm', marker='o', s=30, alpha=0.8, edgecolors='k', linewidth=0.2)
+    
+    # 4. Etiquetas y diseño
+    ax.set_xlabel('Ratio (M/N)')
+    ax.set_ylabel('Modal Ratio (Cajas / Diamantes)')
+    ax.set_zlabel('Tiempo de Ejecución (s)')
+    
+    ax.set_title(f"G14: La Montaña de Dificultad S5 (n={n_target})\n"
+                 "Interacción entre Densidad Proposicional y Asimetría Modal")
+    
+    # Barra de color de referencia
+    cbar = fig.colorbar(sc, ax=ax, shrink=0.5, aspect=10, pad=0.1)
+    cbar.set_label('Tiempo de Ejecución (s)')
+    
+    # Ajustamos el ángulo de visión inicial (Elevación, Azimut)
+    ax.view_init(elev=30, azim=135)
+    
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Warning: G14 skipped. No se encontró la columna 'modal_ratio'.")
+    
+
+# ===================================================================
+# G15: Gráfico 3D (Ratio vs Relación Diamantes/Cajas vs Tiempo)
+# ===================================================================
+if "diamonds" in df.columns and "boxes" in df.columns:
+    # Importamos explicitamente la proyección 3D
+    from mpl_toolkits.mplot3d import Axes3D 
+    import numpy as np
+    
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # 1. Filtramos: quitamos Timeouts y tomamos el 'n' más grande
+    n_target = max(n_values)
+    df_3d = df[(df["n"] == n_target) & (df["result"] != "TO")].copy()
+    
+    # Calculamos la nueva relación: Diamantes / Cajas. 
+    # Reemplazamos 0 cajas por NaN para evitar divisiones por cero (Infinito) que rompen el gráfico 3D
+    df_3d["diam_box_ratio"] = df_3d["diamonds"] / df_3d["boxes"].replace(0, np.nan)
+    
+    # Limpiamos las posibles filas con NaN resultantes
+    df_3d = df_3d.dropna(subset=["diam_box_ratio", "time", "ratio"])
+    
+    # 2. Extraemos las coordenadas
+    x = df_3d["ratio"]
+    y = df_3d["diam_box_ratio"]
+    z = df_3d["time"]
+    
+    # 3. Dibujamos el Scatter 3D. 
+    sc = ax.scatter(x, y, z, c=z, cmap='coolwarm', marker='o', s=30, alpha=0.8, edgecolors='k', linewidth=0.2)
+    
+    # 4. Etiquetas y diseño
+    ax.set_xlabel('Ratio (M/N)')
+    ax.set_ylabel('Dominancia Modal (Diamantes / Cajas)')
+    ax.set_zlabel('Tiempo de Ejecución (s)')
+    
+    ax.set_title(f"G15: La Montaña de Dificultad S5 (n={n_target})\n"
+                 "Efecto de la Dominancia de Diamantes sobre la Densidad Proposicional")
+    
+    # Barra de color de referencia
+    cbar = fig.colorbar(sc, ax=ax, shrink=0.5, aspect=10, pad=0.1)
+    cbar.set_label('Tiempo de Ejecución (s)')
+    
+    # Ajustamos el ángulo de visión inicial (Elevación, Azimut)
+    ax.view_init(elev=30, azim=135)
+    
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Warning: G15 skipped. Faltan las columnas 'diamonds' o 'boxes' en el CSV.")
+# ===================================================================
+# ANÁLISIS ESTADÍSTICO: ¿Dónde está exactamente la mayor dificultad?
+# ===================================================================
+print("\n" + "="*50)
+print("=== ANÁLISIS DE LA ZONA DE MAYOR DIFICULTAD ===")
+print("="*50)
+
+# Filtramos los Timeouts para que no distorsionen las medianas 
+# (o puedes incluirlos si quieres saber la estructura de los TO)
+df_analisis = df[df["result"] != "TO"].copy()
+
+# Asegurarnos de que las columnas sean numéricas
+for col in ["ratio", "time", "boxes", "diamonds"]:
+    if col in df_analisis.columns:
+        df_analisis[col] = pd.to_numeric(df_analisis[col], errors='coerce')
+
+for n in sorted(df_analisis["n"].unique()):
+    n_df = df_analisis[df_analisis["n"] == n]
+    if n_df.empty: continue
+    
+    print(f"\n--- Resultados para n = {n} ---")
+    
+    # MÉTODO 1: El Pico de la Campana (Dificultad Mediana)
+    if "boxes" in n_df.columns and "diamonds" in n_df.columns:
+        # Agrupamos por ratio y sacamos los promedios/medianas
+        grouped = n_df.groupby("ratio").agg(
+            median_time=("time", "median"),
+            avg_boxes=("boxes", "mean"),
+            avg_diamonds=("diamonds", "mean")
+        ).reset_index()
+        
+        # Encontramos la fila con el tiempo mediano más alto
+        peak = grouped.loc[grouped["median_time"].idxmax()]
+        
+        print("1. PICO ESTRUCTURAL (El centro de la campana):")
+        print(f"   - Ratio Crítico: {peak['ratio']:.2f}")
+        print(f"   - Tiempo Mediano: {peak['median_time']:.4f} s")
+        print(f"   - Promedio de Cajas (A): {peak['avg_boxes']:.1f}")
+        print(f"   - Promedio de Diamantes (E): {peak['avg_diamonds']:.1f}")
+
+    # MÉTODO 2: Las Instancias más difíciles (Top 5% de fórmulas)
+    top_percent = 0.1
+    k_top = max(1, int(len(n_df) * top_percent))
+    top_formulas = n_df.nlargest(k_top, "time")
+    
+    print(f"\n2. TOP {int(top_percent*100)}% FÓRMULAS MÁS LENTAS (Las 'asesinas' de Z3):")
+    print(f"   - Ratio Promedio: {top_formulas['ratio'].mean():.2f} (Min: {top_formulas['ratio'].min()}, Max: {top_formulas['ratio'].max()})")
+    print(f"   - Tiempo Promedio: {top_formulas['time'].mean():.4f} s")
+    
+    if "boxes" in top_formulas.columns and "diamonds" in top_formulas.columns:
+        print(f"   - Cajas Promedio: {top_formulas['boxes'].mean():.1f}")
+        print(f"   - Diamantes Promedio: {top_formulas['diamonds'].mean():.1f}")
+        
+    # Extra: Proporción modal de las más difíciles
+    if "modal_ratio" in top_formulas.columns:
+         print(f"   - Relación Modal Promedio (Cajas/Diamantes): {top_formulas['modal_ratio'].mean():.2f}")
+         
+print("\n" + "="*50)
 
 plt.show()
