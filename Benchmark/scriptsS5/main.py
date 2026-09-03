@@ -2,75 +2,66 @@ import sys
 import os
 import s5
 
-benchmark_size = 10 # 10 por configuración es un buen balance entre rigor y tiempo
+benchmark_size = 10 
 benchmark_path = "../formulasS5/"
 
 if __name__ == '__main__':
     os.makedirs(benchmark_path, exist_ok=True)
     
-    n = 120
+    n_values = [120]
     l = 3
     
-    # 1. MUNDOS A PROBAR (Con dos valores probamos el salto estructural)
-# 1. MUNDOS A PROBAR (Los Pesos Pesados)
-    # 800 y 1000 mundos obligarán a Z3 a construir un modelo masivo en memoria.
-    W_values = [800, 1000] 
+    # 1. Worlds for test
+    W_values = [400, 600, 1000]
     
-    # 2. RATIOS MODALES (Diamantes / Cajas)
-    # Centrados exactamente en el punto de máxima fricción (1.0). 
-    # Añadimos 0.8 y 1.2 para ver cómo la campana se inclina hacia los lados.
-    modal_ratios = [0.9, 1.0, 1.1]
-    
-    # 3. RATIOS PROPOSICIONALES (M/N)
-    # Lo desplazamos hacia la derecha. Recuerda que para 1000 mundos, 
-    # los ratios menores a 8.5 son físicamente imposibles, así que el script 
-    # los saltará automáticamente y se concentrará en la zona útil.
-    ratios = [7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12]
+    # 2. RATIO MODAL
+    modal_ratios = [ 0.7, 0.8, 0.9, 1.0, 1.1]
 
-    print("Iniciando generación con Mundos Fijos y Ratios Modales precisos...")
-    generadas = 0
-    omitidas = 0
-    imposibles = 0
+    generated = 0
+    omited = 0
+    impossible = 0
     
-    for W_target in W_values:
-        # Añadimos unos pocos diamantes extra (10) por encima del mínimo exigido por W
-        # Esto permite que haya un poco de "ruido" natural en las cláusulas.
-        D = W_target + 10 
-        
-        for Rm in modal_ratios:
-            # Calculamos las cajas para lograr la relación modal (Diamantes/Cajas)
-            B = int(D / Rm) 
-            
-            for r in ratios:
-                m = int(n * r)
+    for n in n_values:
+        for W_target in W_values:
+            D = W_target + 10 
+
+            predicted_ratio = 0.0050 * W_target + 4.25
+            # Create a larger window around the predicted peak to encompass more ratios
+            r_min = max(4.0, round(predicted_ratio - 5.0, 1))
+            r_max = round(predicted_ratio + 5.0, 1)
+
+            ratios = []
+            r = r_min
+            while r <= r_max + 0.1:
+                ratios.append(round(r, 1))
+                r += 0.5
                 
-                # --- CONTROLES DE FÍSICA MATEMÁTICA ---
-                # 1. ¿Hay suficientes cláusulas para crear los mundos?
-                if (W_target - 1) > m:
-                    imposibles += 1
-                    continue 
-                # 2. ¿Hay suficientes huecos para meter todos los operadores?
-                if (D + B) > (m * l):
-                    imposibles += 1
-                    continue 
+            print(f"-> For W={W_target}, the predicted ratio is {predicted_ratio:.2f}. Exploring only: {ratios}")
+            
+            for Rm in modal_ratios:
+                B = int(D / Rm) 
+                
+                for r in ratios:
+                    m = int(n * r)
                     
-                for i in range(1, benchmark_size + 1):
-                    # Mantengo el nombre original para no romper tu lector de CSV
-                    fname = os.path.join(benchmark_path, f"formula{i}-{n}-{m}-{l}-{D}-{B}.s5")
-                    
-                    if os.path.exists(fname):
-                        omitidas += 1
-                        continue
+                    if (W_target - 1) > m or (D + B) > (m * l):
+                        impossible += 1
+                        continue 
                         
-                    try:
-                        # Asegúrate de usar el s5.phi que acepta W_target al final
-                        formula_str = s5.phi(n, m, l, D, B, W_target)
-                        with open(fname, 'w') as ffile:
-                            ffile.write(formula_str)
-                        generadas += 1
-                        print(f"Generada: {fname} | Mundos: {W_target} | Diam/Cajas: {Rm} | Ratio: {r}")
-                    except Exception as e:
-                        print(f"Error en {fname}: {e}")
+                    for i in range(1, benchmark_size + 1):
+                        fname = os.path.join(benchmark_path, f"formula{i}-{n}-{m}-{l}-{D}-{B}.s5")
                         
+                        if os.path.exists(fname):
+                            omited += 1
+                            continue
+                            
+                        try:
+                            formula_str = s5.phi(n, m, l, D, B, W_target)
+                            with open(fname, 'w') as ffile:
+                                ffile.write(formula_str)
+                            generated += 1
+                        except Exception as e:
+                            print(f"Error en {fname}: {e}")
+                            
     print(f"\nGeneración finalizada.")
-    print(f"Nuevas: {generadas} | Omitidas: {omitidas} | Imposibles: {imposibles}")
+    print(f"Nuevas: {generated} | omited: {omited} | impossible: {impossible}")
