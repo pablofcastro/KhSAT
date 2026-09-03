@@ -7,329 +7,842 @@ import glob
 import argparse
 
 # ===================================================================
-# 0. CONFIGURACIÓN DE PARÁMETROS Y FLAGS DE LÍNEA DE COMANDOS
+# 0. CONFIGURATION
 # ===================================================================
-parser = argparse.ArgumentParser(description="Generador de gráficos de transición de fase S5.")
-parser.add_argument("--all", "-a", action="store_true", 
-                    help="Incluir también todos los CSVs almacenados en la carpeta 'other_batchs/'.")
-args = parser.parse_args()
+
+
+def load_data(include_other=False):
+    file_list = glob.glob("output-batch*.csv")
+    if include_other and os.path.exists("other_batchs"):
+        file_list.extend(glob.glob(os.path.join("other_batchs", "*.csv")))
+
+    dfs = []
+    for file in file_list:
+        try:
+            df_temp = pd.read_csv(file)
+            if not df_temp.empty:
+                dfs.append(df_temp)
+        except (pd.errors.EmptyDataError, FileNotFoundError):
+            pass
+
+    if not dfs:
+        return None
+
+    return pd.concat(dfs, ignore_index=True)
+
+
+def clean_data(df):
+    df = df.copy()
+    df["result"] = df["result"].astype(str).str.replace(".", "", regex=False)
+
+    numeric_cols = [
+        "n",
+        "m",
+        "ratio",
+        "modal_ratio",
+        "z3_time",
+        "translation_time",
+        "time",
+        "total_time",
+        "worlds",
+        "diamonds",
+        "boxes",
+        "size",
+    ]
+
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna(subset=["n", "z3_time", "translation_time", "time"])
+    df["n"] = df["n"].astype(int)
+
+    if "diamonds" in df.columns and "boxes" in df.columns:
+        df["diam_box_ratio"] = df["diamonds"] / df["boxes"].replace(0, np.nan)
+        df["rm_group"] = df["diam_box_ratio"].round(1)
+
+    df["overhead_ratio"] = df["translation_time"] / (df["z3_time"] + 0.0001)
+
+    return df
+
 
 # ===================================================================
-# 1. CARGA Y LIMPIEZA DE DATOS
+# HELPERS
 # ===================================================================
-# Busca automáticamente todos los output-batch*.csv en la carpeta actual
-file_list = glob.glob("output-batch*.csv")
 
-# Si se pasa el flag --all, agregamos los CSVs de la carpeta 'other_batchs/'
-if args.all:
-    other_folder = "other_batchs"
-    if os.path.exists(other_folder):
-        other_files = glob.glob(os.path.join(other_folder, "*.csv"))
-        file_list.extend(other_files)
-        print(f"--> MODO COMPLETO (--all) ACTIVADO: Procesando {len(file_list)} CSVs (actuales + '{other_folder}/').")
-    else:
-        print(f"--> ADVERTENCIA: Se usó --all pero la carpeta '{other_folder}/' no existe aún. Procesando solo actuales.")
-else:
-    print(f"--> MODO SOLO ACTUALES ACTIVADO: Procesando {len(file_list)} CSVs de la carpeta actual.")
-    print("    (Tip: Usa 'python3 plot_modal.py --all' para incluir los de 'other_batchs/')")
-
-dfs = []
-for f in file_list:
-    try:
-        df_temp = pd.read_csv(f)
-        if not df_temp.empty:
-            dfs.append(df_temp)
-    except (pd.errors.EmptyDataError, FileNotFoundError):
-        pass
-
-if not dfs:
-    print("No se encontraron archivos CSV válidos con datos. Verifica la carpeta.")
-    sys.exit(1)
-    
-df = pd.concat(dfs, ignore_index=True)
-df["result"] = df["result"].str.replace(".", "", regex=False)
-
-# Aseguramos tipos numéricos
-numeric_cols = ["n", "ratio", "time", "worlds", "diamonds", "boxes"]
-for col in numeric_cols:
-    if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-# Auto-detectar 'n'
-df = df.dropna(subset=["n"])
-df["n"] = df["n"].astype(int)
-n_values = sorted(df["n"].unique())
-print(f"Valores de 'n' detectados: {n_values}")
-
-# Calcular Relación Modal (Diamantes / Cajas)
-if "diamonds" in df.columns and "boxes" in df.columns:
-    df["diam_box_ratio"] = df["diamonds"] / df["boxes"].replace(0, np.nan)
-    # Agrupamos en los saltos (0.5, 1.0, 1.5, 2.0, etc.)
-    df["rm_group"] = df["diam_box_ratio"].round(1)
-
-# Estilos unificados
 COLORS = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
 LINESTYLES = ["-", "--", ":", "-."]
 MARKERS = ["o", "s", "^", "D", "v", "P"]
 
-def style_for(idx):
-    return {"color": COLORS[idx % len(COLORS)], "linestyle": LINESTYLES[idx % len(LINESTYLES)], "marker": MARKERS[idx % len(MARKERS)]}
 
-# ===================================================================
-# FUNCIÓN DE INTERPOLACIÓN DEL THRESHOLD
-# ===================================================================
+def style_for(idx):
+    return {
+        "color": COLORS[idx % len(COLORS)],
+        "linestyle": LINESTYLES[idx % len(LINESTYLES)],
+        "marker": MARKERS[idx % len(MARKERS)],
+    }
+
+
 def interpolate_threshold(frac):
+    """
+    Interpolates the ratio where P(SAT) crosses 0.5.
+    """
     xs = frac.index.to_numpy()
     ys = frac.values
+
     if 0.5 in ys:
         return xs[list(ys).index(0.5)]
+
     for i in range(len(xs) - 1):
-        if (ys[i] >= 0.5 and ys[i + 1] <= 0.5):
+        if ys[i] >= 0.5 and ys[i + 1] <= 0.5:
             t = (0.5 - ys[i]) / (ys[i + 1] - ys[i])
             return xs[i] + t * (xs[i + 1] - xs[i])
     return None
 
-# Pre-calculamos Thresholds
-thresholds_rm = {}
-n_target = max(n_values)
-n_df = df[df["n"] == n_target].copy()
-decided = n_df[n_df["result"] != "TO"]
-rm_groups = sorted(decided["rm_group"].dropna().unique())
 
-for rm in rm_groups:
-    sub_df = decided[decided["rm_group"] == rm]
-    frac = sub_df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
-    if len(frac) > 1:
-        thresholds_rm[rm] = interpolate_threshold(frac)
+def get_sat_fraction(df):
+    return (
+        df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
+    )
 
-# ===================================================================
-# T1: LA SIGMOIDE - TRANSICIÓN DE FASE SEPARADA POR RELACIÓN MODAL
-# ===================================================================
-plt.figure(figsize=(10, 6))
-plt.axhline(0.5, color="black", linestyle="--", linewidth=1.5, label="Cruce P(SAT) = 0.5")
 
-for idx, rm in enumerate(rm_groups):
-    st = style_for(idx)
-    sub_df = decided[decided["rm_group"] == rm]
-    frac = sub_df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
-    
-    if len(frac) > 1:
-        plt.plot(frac.index, frac.values, marker=st["marker"], linestyle=st["linestyle"],
-                 color=st["color"], label=f"Diam/Cajas = {rm}")
-        th = thresholds_rm.get(rm)
-        if th is not None:
-            plt.axvline(th, color=st["color"], linestyle=":", linewidth=2, alpha=0.8)
+def get_median_time(df, column):
+    return df.groupby("ratio")[column].median().sort_index()
 
-plt.xlabel("Densidad Proposicional (Ratio M/N)")
-plt.ylabel("Probabilidad de ser SAT (P(SAT))")
-plt.ylim(-0.05, 1.05)
-plt.title(f"T1: Curvas Sigmoides de Transición de Fase (n={n_target})\n"
-          "Líneas punteadas verticales marcan el Threshold exacto P(SAT)=0.5.")
-plt.legend()
-plt.grid(True, alpha=0.3)
+
+def prepare_world_buckets(decided):
+    decided_w = decided.copy()
+
+    if decided_w.empty:
+        return decided_w, []
+
+    max_worlds = int(decided_w["worlds"].max())
+    max_worlds = max(max_worlds, 100)
+    bins = list(range(0, max_worlds + 200, 100))
+    labels = [f"{bins[i]}-{bins[i + 1]}" for i in range(len(bins) - 1)]
+    decided_w["w_bucket"] = pd.cut(decided_w["worlds"], bins=bins, labels=labels)
+    active_buckets = sorted(
+        decided_w["w_bucket"].dropna().unique(), key=lambda x: labels.index(x)
+    )
+
+    return decided_w, active_buckets
+
 
 # ===================================================================
-# T2: CAMPANA DE DIFICULTAD SEPARADA POR RELACIÓN MODAL
+# T1: CURVA DE TRANSICIÓN SAT/UNSAT
 # ===================================================================
-plt.figure(figsize=(10, 6))
-for idx, rm in enumerate(rm_groups):
-    st = style_for(idx)
-    sub_df = decided[decided["rm_group"] == rm]
-    med = sub_df.groupby("ratio")["time"].median().sort_index()
-    
-    if len(med) > 1:
-        plt.plot(med.index, med.values, marker=st["marker"], linestyle=st["linestyle"],
-                 color=st["color"], label=f"Diam/Cajas = {rm}")
-        th = thresholds_rm.get(rm)
-        if th is not None:
-            plt.axvline(th, color=st["color"], linestyle=":", linewidth=2, alpha=0.8)
 
-plt.xlabel("Densidad Proposicional (Ratio M/N)")
-plt.ylabel("Tiempo Mediano (s)")
-plt.yscale("log")
-plt.title(f"T2: Dificultad Computacional y Thresholds (n={n_target})\n"
-          "Alineación visual del pico de la campana con el Threshold P(SAT)=0.5.")
-plt.legend()
-plt.grid(True, alpha=0.3)
+
+def plot_t1(decided_w, active_buckets, rm_groups):
+
+    if not active_buckets:
+        return
+
+    ncols = min(3, len(active_buckets))
+    nrows = int(np.ceil(len(active_buckets) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(6 * ncols, 5 * nrows), sharey=True)
+    axes = np.atleast_1d(axes).ravel()
+
+    for ax, bucket in zip(axes, active_buckets):
+        sub_df = decided_w[decided_w["w_bucket"] == bucket]
+
+        for idx, rm in enumerate(rm_groups):
+            st = style_for(idx)
+            rm_df = sub_df[sub_df["rm_group"] == rm]
+            frac = get_sat_fraction(rm_df)
+
+            if len(frac) <= 1:
+                continue
+
+            ax.plot(
+                frac.index,
+                frac.values,
+                marker=st["marker"],
+                linestyle=st["linestyle"],
+                color=st["color"],
+                linewidth=1.8,
+                label=f"Diam/Cajas = {rm}",
+            )
+            threshold = interpolate_threshold(frac)
+
+            if threshold is not None:
+                ax.axvline(
+                    threshold,
+                    color=st["color"],
+                    linestyle=":",
+                    linewidth=1.5,
+                    alpha=0.7,
+                )
+
+        ax.axhline(0.5, color="black", linestyle="--", linewidth=1)
+        ax.set_title(f"Mundos {bucket}")
+        ax.set_xlabel("Densidad Proposicional (Ratio M/N)")
+        ax.set_ylim(-0.05, 1.05)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best", fontsize=8)
+
+    for ax in axes[len(active_buckets) :]:
+        ax.set_visible(False)
+
+    axes[0].set_ylabel("Probabilidad de ser SAT (P(SAT))")
+    fig.suptitle(
+        "T1: Curva de transición SAT/UNSAT por Cantidad de Mundos", fontsize=14
+    )
+    plt.tight_layout()
+
 
 # ===================================================================
-# T3: DIFICULTAD AISLANDO LA CANTIDAD DE MUNDOS FÍSICOS (Cada 100)
+# T2: CAMPANA DE DIFICULTAD
 # ===================================================================
-plt.figure(figsize=(11, 6))
+def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
 
-decided_w = decided.copy()
-max_worlds = int(decided_w["worlds"].max()) if not decided_w.empty else 1600
-bins = list(range(0, max_worlds + 200, 100))
-labels = [f"{bins[i]}-{bins[i+1]}" for i in range(len(bins)-1)]
-decided_w["w_bucket"] = pd.cut(decided_w["worlds"], bins=bins, labels=labels)
+    if not world_panels:
+        return
 
-active_buckets = sorted(decided_w["w_bucket"].dropna().unique(), key=lambda x: labels.index(x))
+    fig, axes = plt.subplots(
+        1, len(world_panels), figsize=(5 * len(world_panels), 5), sharey=True
+    )
 
-for idx, bucket in enumerate(active_buckets):
-    st = style_for(idx)
-    sub_df = decided_w[decided_w["w_bucket"] == bucket]
-    med = sub_df.groupby("ratio")["time"].median().sort_index()
-    frac = sub_df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
-    
-    if len(med) > 1:
-        plt.plot(med.index, med.values, marker=st["marker"], linestyle="-", linewidth=2,
-                 color=st["color"], label=str(bucket))
-        th = interpolate_threshold(frac)
-        if th is not None:
-            plt.axvline(th, color=st["color"], linestyle=":", linewidth=2, alpha=0.8)
+    if len(world_panels) == 1:
+        axes = [axes]
 
-plt.xlabel("Densidad Proposicional (Ratio M/N)")
-plt.ylabel("Tiempo Mediano (s)")
-plt.yscale("log")
-plt.title(f"T3: Campanas y Thresholds por Tamaño del Modelo (n={n_target})\n"
-          "Cada grupo de mundos muestra su línea de Threshold individual.")
-plt.legend(title="Mundos Reales", bbox_to_anchor=(1.05, 1), loc='upper left')
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
+    for ax, bucket in zip(axes, world_panels):
+        sub_df = decided_w[decided_w["w_bucket"] == bucket]
+        for idx, rm in enumerate(rm_groups):
+            st = style_for(idx)
+            rm_df = sub_df[sub_df["rm_group"] == rm]
+            med = get_median_time(rm_df, time_column)
+
+            if len(med) <= 1:
+                continue
+
+            ax.plot(
+                med.index,
+                med.values,
+                marker=st["marker"],
+                linestyle=st["linestyle"],
+                color=st["color"],
+                label=f"Diam/Cajas = {rm}",
+            )
+            frac = get_sat_fraction(rm_df)
+            threshold = interpolate_threshold(frac)
+
+            if threshold is not None:
+                ax.axvline(
+                    threshold,
+                    color=st["color"],
+                    linestyle=":",
+                    linewidth=1.5,
+                    alpha=0.7,
+                )
+        ax.set_title(f"Mundos {bucket}")
+        ax.set_xlabel("Ratio proposicional (M/N)")
+        ax.set_yscale("log")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="upper left", fontsize=8)
+
+    axes[0].set_ylabel(ylabel)
+    fig.suptitle(title)
+    plt.tight_layout()
+
 
 # ===================================================================
-# T4: MAPA DE CALOR (HEATMAP) 2D - RATIO vs RELACIÓN MODAL
+# T3: CAMPANAS POR TAMAÑO DE MODELO
 # ===================================================================
-plt.figure(figsize=(10, 8))
-pivot = decided.pivot_table(index="rm_group", columns="ratio", values="time", aggfunc="median")
+def plot_t3(decided_w, active_buckets, time_column, title):
 
-if not pivot.empty:
-    plt.imshow(pivot.values, aspect="auto", origin="lower", cmap="viridis",
-               extent=[pivot.columns.min(), pivot.columns.max(), pivot.index.min(), pivot.index.max()])
-    plt.colorbar(label="Tiempo Mediano de Ejecución (s)")
+    plt.figure(figsize=(11, 6))
+    for idx, bucket in enumerate(active_buckets):
+        st = style_for(idx)
+        sub_df = decided_w[decided_w["w_bucket"] == bucket]
+        med = get_median_time(sub_df, time_column)
+        frac = get_sat_fraction(sub_df)
+
+        if len(med) <= 1:
+            continue
+
+        plt.plot(
+            med.index,
+            med.values,
+            marker=st["marker"],
+            linestyle="-",
+            linewidth=2,
+            color=st["color"],
+            label=str(bucket),
+        )
+
+        threshold = interpolate_threshold(frac)
+
+        if threshold is not None:
+            plt.axvline(
+                threshold, color=st["color"], linestyle=":", linewidth=2, alpha=0.8
+            )
+
     plt.xlabel("Densidad Proposicional (Ratio M/N)")
-    plt.ylabel("Relación Modal (Diamantes / Cajas)")
-    plt.title(f"T4: Heatmap de Complejidad S5 (n={n_target})\n"
-              "Vista superior de la zona de asfixia del solver Z3.")
-else:
-    print("Warning: No hay datos suficientes para el Heatmap T4.")
+    if time_column == "z3_time":
+        plt.ylabel("Tiempo Mediano (Z3, s)")
+    else:
+        plt.ylabel("Tiempo Mediano (TOTAL, s)")
+    plt.yscale("log")
+    plt.title(title)
+    plt.legend(title="Mundos Reales", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
 
 # ===================================================================
-# T5: LA MONTAÑA 3D (LÍNEAS) - RATIO vs RELACIÓN MODAL vs TIEMPO
+# T5: MONTAÑA 3D
 # ===================================================================
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')
+def plot_t5(decided_w, active_buckets, time_column, title, zlabel):
 
-max_time_global = decided["time"].max()
-cmap = plt.get_cmap('coolwarm')
+    if not active_buckets:
+        return
 
-for rm_val in rm_groups:
-    sub_df = decided[decided["rm_group"] == rm_val]
-    grouped = sub_df.groupby("ratio")["time"].median().sort_index()
-    
-    if len(grouped) > 1:
-        xs = grouped.index.to_numpy()
-        zs = grouped.values
-        ys = np.full_like(xs, rm_val)
-        
-        color_val = cmap(zs.max() / max_time_global)
-        ax.plot(xs, ys, zs, color=color_val, linewidth=3, alpha=0.8)
-        ax.scatter(xs, ys, zs, color=color_val, s=25, edgecolors='white', linewidth=0.5)
+    ncols = min(3, max(1, len(active_buckets)))
+    nrows = max(1, int(np.ceil(len(active_buckets) / ncols)))
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=(5 * ncols, 4 * nrows),
+        subplot_kw={"projection": "3d"},
+    )
+    axes = np.atleast_1d(axes).ravel()
+    cmap = plt.get_cmap("coolwarm")
+    for ax, bucket in zip(axes, active_buckets):
+        sub_df = decided_w[decided_w["w_bucket"] == bucket]
 
-ax.set_xlabel('Ratio M/N', labelpad=10)
-ax.set_ylabel('Diamantes / Cajas', labelpad=10)
-ax.set_zlabel('Tiempo Mediano (s)', labelpad=10)
-ax.set_title(f"T5: Topología de la Dificultad Modal S5 (n={n_target})\n"
-             "Líneas de nivel que muestran la explosión de tiempo.")
-ax.view_init(elev=25, azim=135)
-plt.tight_layout()
+        if sub_df.empty or pd.isna(sub_df[time_column].max()):
+            ax.set_visible(False)
+            continue
 
-# ===================================================================
-# ANÁLISIS ESTADÍSTICO DE LOS DATOS (Consola)
-# ===================================================================
-print("\n" + "="*60)
-print("=== RESUMEN DE LA ANATOMÍA DE FÓRMULAS DIFÍCILES ===")
-print("="*60)
+        max_time_local = sub_df[time_column].max()
+        for rm_val in sorted(sub_df["rm_group"].dropna().unique()):
+            rm_df = sub_df[sub_df["rm_group"] == rm_val]
+            grouped = rm_df.groupby("ratio")[time_column].median().sort_index()
 
-for n in n_values:
-    n_df = df[(df["n"] == n) & (df["result"] != "TO")].copy()
-    if n_df.empty: continue
-    
-    print(f"\n--- Resultados para n = {n} ---")
-    
-    grouped = n_df.groupby("ratio").agg(
-        median_time=("time", "median"), avg_boxes=("boxes", "mean"), avg_diamonds=("diamonds", "mean")
-    ).reset_index()
-    
-    peak = grouped.loc[grouped["median_time"].idxmax()]
-    print("1. PICO CENTRAL (Mediana de la muestra general):")
-    print(f"   - Ratio Crítico: {peak['ratio']:.2f}  |  Tiempo: {peak['median_time']:.4f} s")
-    print(f"   - Diamantes: {peak['avg_diamonds']:.0f}  |  Cajas: {peak['avg_boxes']:.0f}")
+            if len(grouped) <= 1:
+                continue
 
-    top_percent = 0.05
-    k_top = max(1, int(len(n_df) * top_percent))
-    top_formulas = n_df.nlargest(k_top, "time")
-    
-    print(f"\n2. CASOS PATOLÓGICOS (Top {int(top_percent*100)}% fórmulas más lentas):")
-    print(f"   - Ratio Promedio: {top_formulas['ratio'].mean():.2f}")
-    print(f"   - Diamantes Promedio: {top_formulas['diamonds'].mean():.0f}")
-    print(f"   - Cajas Promedio: {top_formulas['boxes'].mean():.0f}")
-    print(f"   - Relación Modal (Diam/Cajas) Promedio: {top_formulas['diam_box_ratio'].mean():.2f}")
+            xs = grouped.index.to_numpy()
+            zs = grouped.values
+            ys = np.full_like(xs, rm_val)
 
-print("\n" + "="*60)
+            if max_time_local > 0:
+                normalized = np.clip(zs.max() / max_time_local, 0, 1)
+            else:
+                normalized = 0
+
+            color_val = cmap(normalized)
+            ax.plot(xs, ys, zs, color=color_val, linewidth=2.5, alpha=0.9)
+            ax.scatter(
+                xs, ys, zs, color=color_val, s=20, edgecolors="white", linewidth=0.5
+            )
+
+        ax.set_title(f"{bucket}")
+        ax.set_xlabel("Ratio M/N", labelpad=8)
+        ax.set_ylabel("Diam/Cajas", labelpad=8)
+        ax.set_zlabel(zlabel, labelpad=8)
+        ax.view_init(elev=25, azim=135)
+
+    for ax in axes[len(active_buckets) :]:
+        ax.set_visible(False)
+
+    fig.suptitle(title)
+    plt.tight_layout()
+
 
 # ===================================================================
-# T6: LA ECUACIÓN DE LA DIFICULTAD S5 (Mundos vs Threshold)
+# T6: ECUACIÓN DE TRANSICIÓN DE FASE
 # ===================================================================
-plt.figure(figsize=(10, 6))
+def plot_t6(decided_w, active_buckets):
 
-x_worlds = []
-y_thresholds = []
+    plt.figure(figsize=(10, 6))
+    x_worlds = []
+    y_thresholds = []
 
-# Reutilizamos los buckets de mundos calculados en T3
-for bucket in active_buckets:
-    sub_df = decided_w[decided_w["w_bucket"] == bucket]
-    if sub_df.empty: 
-        continue
-    
-    # Buscamos el threshold para este grupo de mundos
-    frac = sub_df.groupby("ratio")["result"].apply(lambda r: (r == "SAT").mean()).sort_index()
-    th = interpolate_threshold(frac)
-    
-    if th is not None:
-        # Tomamos la cantidad real de mundos promedio en este bucket como coordenada X
-        mean_w = sub_df["worlds"].mean()
-        x_worlds.append(mean_w)
-        y_thresholds.append(th)
+    for bucket in active_buckets:
+        sub_df = decided_w[decided_w["w_bucket"] == bucket]
 
-if len(x_worlds) > 1:
-    # 1. Dibujamos los puntos reales
-    plt.scatter(x_worlds, y_thresholds, color="red", s=100, zorder=5, edgecolors='black', label="Thresholds Empíricos")
-    
-    # 2. Calculamos la Regresión Lineal (Y = mX + B)
-    # x_worlds = Mundos, y_thresholds = Ratio
-    coefs, cov = np.polyfit(x_worlds, y_thresholds, 1, cov=True)
-    m, b = coefs # m = pendiente, b = ordenada al origen
-    
-    # R-cuadrado para ver qué tan perfecto es el ajuste
-    correlation_matrix = np.corrcoef(x_worlds, y_thresholds)
-    correlation_xy = correlation_matrix[0,1]
-    r_squared = correlation_xy**2
-    
-    # 3. Dibujamos la recta de tendencia
-    x_line = np.linspace(min(x_worlds)*0.8, max(x_worlds)*1.1, 100)
-    y_line = m * x_line + b
-    
-    plt.plot(x_line, y_line, color="blue", linestyle="--", linewidth=2,
-             label=f"Ajuste Lineal ($R^2={r_squared:.2f}$)\n$Ratio = {m:.4f} \\times W + {b:.2f}$")
-    
-    # Imprimimos tu descubrimiento por consola
-    print("\n" + "*"*70)
-    print("🌟 ¡DESCUBRIMIENTO: LA ECUACIÓN DE TRANSICIÓN DE FASE S5! 🌟")
-    print("*"*70)
-    print(f"Para N={n_target}, la relación matemática entre Mundos (W) y Ratio Crítico (r) es:")
-    print(f"   --->  r = {m:.4f} * W + {b:.4f}")
-    print(f"Precisión del ajuste (R^2): {r_squared:.4f} (1.0 es perfecto)")
-    print("*"*70 + "\n")
-else:
-    print("\nNota: Se necesitan al menos 2 Thresholds válidos para calcular la regresión lineal en T6.")
+        if sub_df.empty:
+            continue
 
-plt.xlabel("Cantidad Promedio de Mundos ($W$)")
-plt.ylabel("Ratio Crítico (Umbral $P(SAT) = 0.5$)")
-plt.title(f"T6: Relación Matemática entre Mundos y Transición de Fase (n={n_target})\n"
-          "Comprobación empírica del desplazamiento del Threshold computacional en S5.")
-plt.legend()
-plt.grid(True, linestyle=":", alpha=0.6)
+        frac = get_sat_fraction(sub_df)
+        threshold = interpolate_threshold(frac)
 
-# Mostrar las ventanas de los gráficos
-plt.show()
+        if threshold is not None:
+            x_worlds.append(sub_df["worlds"].mean())
+            y_thresholds.append(threshold)
+
+    if len(x_worlds) <= 1:
+        return None, None
+
+    plt.scatter(
+        x_worlds,
+        y_thresholds,
+        color="red",
+        s=100,
+        zorder=5,
+        edgecolors="black",
+        label="Thresholds Empíricos",
+    )
+
+    coefs = np.polyfit(x_worlds, y_thresholds, 1)
+    m_coef, b_coef = coefs
+    r_squared = np.corrcoef(x_worlds, y_thresholds)[0, 1] ** 2
+    x_line = np.linspace(min(x_worlds) * 0.8, max(x_worlds) * 1.1, 100)
+
+    plt.plot(
+        x_line,
+        m_coef * x_line + b_coef,
+        color="blue",
+        linestyle="--",
+        linewidth=2,
+        label=(
+            f"Ajuste Lineal "
+            f"($R^2={r_squared:.2f}$)\n"
+            f"$Ratio = {m_coef:.4f}"
+            f"\\times W + {b_coef:.2f}$"
+        ),
+    )
+
+    plt.xlabel("Cantidad Promedio de Mundos ($W$)")
+    plt.ylabel("Ratio Crítico " "(Umbral $P(SAT) = 0.5$)")
+    plt.title("T6: Relación Matemática entre Mundos y Transición de Fase")
+    plt.legend()
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.tight_layout()
+
+    return m_coef, b_coef, r_squared
+
+
+# ===================================================================
+# G1: DISPERSIÓN
+# ===================================================================
+def plot_g1(df):
+
+    plt.figure(figsize=(10, 6))
+    sat_df = df[df["result"] == "SAT"]
+    unsat_df = df[df["result"] == "UNSAT"]
+    plt.scatter(
+        sat_df["z3_time"],
+        sat_df["translation_time"],
+        c="blue",
+        alpha=0.6,
+        label="SAT",
+        edgecolor="k",
+    )
+    plt.scatter(
+        unsat_df["z3_time"],
+        unsat_df["translation_time"],
+        c="red",
+        alpha=0.6,
+        label="UNSAT",
+        edgecolor="k",
+        marker="s",
+    )
+    plt.xlabel("Tiempo de Z3 (segundos)")
+    plt.ylabel("Tiempo de Traducción en Python (segundos)")
+    plt.title("G1: Cuello de Botella (Traducción vs Resolución)")
+    plt.axvline(
+        x=df["z3_time"].median(),
+        color="gray",
+        linestyle="--",
+        alpha=0.7,
+        label="Mediana Z3",
+    )
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+
+# ===================================================================
+# G2: ESCALAMIENTO POR TAMAÑO
+# ===================================================================
+def plot_g2(df):
+    plt.figure(figsize=(10, 6))
+    df_sorted = df.sort_values("size")
+    window = max(1, len(df_sorted) // 20)
+    plt.plot(
+        df_sorted["size"] / 1024,
+        df_sorted["translation_time"].rolling(window).mean(),
+        color="purple",
+        linewidth=3,
+        label="Tiempo de Traducción (Tendencia)",
+    )
+    plt.plot(
+        df_sorted["size"] / 1024,
+        df_sorted["z3_time"].rolling(window).mean(),
+        color="green",
+        linewidth=3,
+        label="Tiempo de Z3 (Tendencia)",
+    )
+    plt.xlabel("Tamaño de la Fórmula en KB (Fricción de Memoria)")
+    plt.ylabel("Tiempo Promedio (segundos)")
+    plt.title("G2: Escalamiento del Tiempo respecto al Peso de la Fórmula")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+
+# ===================================================================
+# G3: DIAMANTES VS CAJAS
+# ===================================================================
+def plot_g3(df):
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # ---------------------------------------------------------------
+    # G3A: MUNDOS / DIAMANTES
+    # ---------------------------------------------------------------
+
+    world_data = []
+    world_values = sorted(df["diamonds"].dropna().unique())
+
+    for value in world_values:
+        values = df[df["diamonds"] == value]["translation_time"].dropna()
+        world_data.append(values)
+
+    ax1.boxplot(world_data, tick_labels=[str(int(x)) for x in world_values])
+
+    # Agregar mediana encima de cada boxplot
+    for i, values in enumerate(world_data, start=1):
+
+        if len(values) == 0:
+            continue
+
+        median = values.median()
+        ax1.text(
+            i, median + 1.5, f"{median:.2f} s", ha="center", va="bottom", fontsize=10
+        )
+
+    ax1.set_xlabel("Cantidad de Diamantes")
+    ax1.set_ylabel("Tiempo de Traducción (s)")
+    ax1.set_title("G3A: Tiempo de Traducción según Tamaño Modal")
+    ax1.grid(True, axis="y", alpha=0.3)
+
+    # ---------------------------------------------------------------
+    # G3B: CAJAS VS TIEMPO DE TRADUCCIÓN
+    # ---------------------------------------------------------------
+
+    ax2.scatter(
+        df["boxes"],
+        df["translation_time"],
+        color="orange",
+        alpha=0.5,
+        edgecolor="k",
+        marker="^",
+    )
+
+    ax2.set_xlabel("Cantidad de Cajas")
+    ax2.set_ylabel("Tiempo de Traducción (s)")
+    ax2.set_title("G3B: Cajas vs Tiempo de Traducción")
+    ax2.grid(True, alpha=0.3)
+    fig.suptitle("G3: Impacto de los Operadores Modales sobre el Parser")
+    plt.tight_layout()
+
+
+# ===================================================================
+# G4: IMPACTO DE RATIOS
+# ===================================================================
+def plot_g4(df):
+
+    df_plot_modal = df[df["modal_ratio"] < 900]
+    fig, (ax3, ax4) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # G4A
+    ax3.scatter(
+        df["ratio"],
+        df["translation_time"],
+        color="purple",
+        alpha=0.5,
+        edgecolor="k",
+        label="Traducción",
+    )
+
+    ax3.scatter(
+        df["ratio"], df["z3_time"], color="green", alpha=0.5, edgecolor="k", label="Z3"
+    )
+    ax3.set_xlabel("Ratio Proposicional (m/n)")
+    ax3.set_ylabel("Tiempo (s)")
+    ax3.set_title("G4A: Impacto del Ratio Proposicional")
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+
+    # G4B
+    ax4.scatter(
+        df_plot_modal["modal_ratio"],
+        df_plot_modal["translation_time"],
+        color="purple",
+        alpha=0.5,
+        edgecolor="k",
+        label="Traducción",
+    )
+
+    ax4.scatter(
+        df_plot_modal["modal_ratio"],
+        df_plot_modal["z3_time"],
+        color="green",
+        alpha=0.5,
+        edgecolor="k",
+        label="Z3",
+    )
+
+    ax4.set_xlabel("Ratio Modal (Diamantes / Cajas)")
+    ax4.set_ylabel("Tiempo (s)")
+    ax4.set_title("G4B: Impacto del Ratio Modal")
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+
+# ===================================================================
+# REPORTE EN CONSOLA
+# ===================================================================
+def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
+
+    print("\n" + "=" * 80)
+    print("=== MEGA-REPORTE: ANATOMÍA Z3 Y CUELLOS DE BOTELLA ===")
+    print("=" * 80)
+
+    for n in n_values:
+        n_df = df[(df["n"] == n) & (df["result"] != "TO")].copy()
+
+        if n_df.empty:
+            continue
+
+        print(f"\n--- Resultados Z3 para n = {n} ---")
+
+        grouped = (
+            n_df.groupby("ratio")
+            .agg(
+                median_time=("z3_time", "median"),
+                avg_boxes=("boxes", "mean"),
+                avg_diamonds=("diamonds", "mean"),
+            )
+            .reset_index()
+        )
+
+        peak = grouped.loc[grouped["median_time"].idxmax()]
+
+        print(
+            f" Pico Central -> "
+            f"Ratio Crítico: {peak['ratio']:.2f} | "
+            f"Tiempo Z3: {peak['median_time']:.4f} s "
+            f"(Diam: {peak['avg_diamonds']:.0f}, "
+            f"Cajas: {peak['avg_boxes']:.0f})"
+        )
+
+    if len(x_worlds) > 1:
+        print(
+            f"\n[ ECUACIÓN S5 ] "
+            f"r = {m_coef:.4f} * W + "
+            f"{b_coef:.4f} "
+            f"(R2={r_squared:.4f})"
+        )
+
+    print("\n--- Correlaciones de Cuello de Botella " "(1.0 = impacto directo) ---")
+
+    columnas_corr = [
+        "size",
+        "m",
+        "ratio",
+        "worlds",
+        "diamonds",
+        "boxes",
+        "modal_ratio",
+        "translation_time",
+        "z3_time",
+        "time",
+    ]
+
+    correlaciones = df[columnas_corr].corr()
+
+    print("Factores que destruyen la memoria de Python " "(Traducción):")
+
+    for index, value in (
+        correlaciones["translation_time"]
+        .drop(["translation_time", "z3_time", "time"])
+        .items()
+    ):
+
+        print(f"  - {index.ljust(15)}: " f"{value:.3f}")
+
+    print("\nFactores que ralentizan el algoritmo lógico " "(Z3):")
+
+    for index, value in (
+        correlaciones["z3_time"].drop(["translation_time", "z3_time", "time"]).items()
+    ):
+
+        print(f"  - {index.ljust(15)}: " f"{value:.3f}")
+
+    print("\n" + "=" * 80)
+    print("=== TOP 30 FÓRMULAS CON PEOR CUELLO DE BOTELLA ===")
+    print("=" * 80)
+
+    top_ineficientes = df.sort_values("overhead_ratio", ascending=False).head(30)
+
+    columnas_mostrar = [
+        "worlds",
+        "ratio",
+        "modal_ratio",
+        "m",
+        "diamonds",
+        "boxes",
+        "size",
+        "translation_time",
+        "z3_time",
+        "time",
+        "result",
+    ]
+
+    print(top_ineficientes[columnas_mostrar].to_string(index=False))
+
+
+# ===================================================================
+# MAIN
+# ===================================================================
+def main():
+
+    parser = argparse.ArgumentParser(
+        description=("S5 Advanced Analyzer: " "Z3 vs Total Time + Bottlecuts.")
+    )
+
+    parser.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help=("Include CSVs from " "'other_batchs/'."),
+    )
+
+    args = parser.parse_args()
+
+    # ---------------------------------------------------------------
+    # Cargar datos
+    # ---------------------------------------------------------------
+
+    df = load_data(include_other=args.all)
+
+    if df is None:
+        print("Doesn't found valid CSV files.")
+        sys.exit(1)
+
+    # ---------------------------------------------------------------
+    # Limpiar datos
+    # ---------------------------------------------------------------
+
+    df = clean_data(df)
+
+    n_values = sorted(df["n"].unique())
+
+    # ---------------------------------------------------------------
+    # Datos principales
+    # ---------------------------------------------------------------
+
+    n_target = max(n_values)
+    n_df = df[df["n"] == n_target].copy()
+    decided = n_df[n_df["result"] != "TO"].copy()
+    rm_groups = sorted(decided["rm_group"].dropna().unique())
+    decided_w, active_buckets = prepare_world_buckets(decided)
+    world_panels = active_buckets[:3]
+
+    # ---------------------------------------------------------------
+    # T1
+    # ---------------------------------------------------------------
+    plot_t1(decided_w, active_buckets, rm_groups)
+
+    # ---------------------------------------------------------------
+    # T2 Z3
+    # ---------------------------------------------------------------
+    plot_t2(
+        decided_w,
+        world_panels,
+        rm_groups,
+        "z3_time",
+        "T2-Z3: Dificultad Z3 por mundos y relación modal",
+        "Tiempo mediano (Z3, s)",
+    )
+
+    # ---------------------------------------------------------------
+    # T3 Z3
+    # ---------------------------------------------------------------
+    plot_t3(
+        decided_w, active_buckets, "z3_time", "T3-Z3: Campanas y Thresholds (Z3 Time)"
+    )
+
+    # ---------------------------------------------------------------
+    # T5 Z3
+    # ---------------------------------------------------------------
+    plot_t5(
+        decided_w,
+        active_buckets,
+        "z3_time",
+        "T5-Z3: Montaña 3D de Complejidad (Z3 Time)",
+        "Mediana (Z3, s)",
+    )
+
+    # ---------------------------------------------------------------
+    # T6
+    # ---------------------------------------------------------------
+    result_t6 = plot_t6(decided_w, active_buckets)
+    if result_t6[0] is not None:
+        m_coef, b_coef, r_squared = result_t6
+        # Recuperar los valores utilizados para el reporte
+        x_worlds = []
+        y_thresholds = []
+        for bucket in active_buckets:
+            sub_df = decided_w[decided_w["w_bucket"] == bucket]
+            if sub_df.empty:
+                continue
+            frac = get_sat_fraction(sub_df)
+            threshold = interpolate_threshold(frac)
+            if threshold is not None:
+                x_worlds.append(sub_df["worlds"].mean())
+                y_thresholds.append(threshold)
+    else:
+        x_worlds = []
+        m_coef = None
+        b_coef = None
+        r_squared = None
+
+    # ---------------------------------------------------------------
+    # T2 TOTAL
+    # ---------------------------------------------------------------
+    plot_t2(
+        decided_w,
+        world_panels,
+        rm_groups,
+        "time",
+        "T2-TOTAL: Dificultad (incluyendo overhead de Python)",
+        "Tiempo mediano (TOTAL, s)",
+    )
+
+    # ---------------------------------------------------------------
+    # T3 TOTAL
+    # ---------------------------------------------------------------
+    plot_t3(
+        decided_w,
+        active_buckets,
+        "time",
+        "T3-TOTAL: Campanas Deformadas por el Parser (Total Time)",
+    )
+
+    # ---------------------------------------------------------------
+    # T5 TOTAL
+    # ---------------------------------------------------------------
+    plot_t5(
+        decided_w,
+        active_buckets,
+        "time",
+        "T5-TOTAL: Montaña 3D (Z3 + Python Overhead)",
+        "Mediana (TOTAL, s)",
+    )
+    plot_g1(df)
+    plot_g2(df)
+    plot_g3(df)
+    plot_g4(df)
+    plt.show()
+
+    print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared)
+
+
+if __name__ == "__main__":
+    main()
