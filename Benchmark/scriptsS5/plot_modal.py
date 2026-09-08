@@ -487,7 +487,7 @@ def plot_g2(df):
 # ===================================================================
 def plot_g3(df):
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    plt.figure(figsize=(14, 6))
 
     # ---------------------------------------------------------------
     # G3A: MUNDOS / DIAMANTES
@@ -500,7 +500,7 @@ def plot_g3(df):
         values = df[df["diamonds"] == value]["translation_time"].dropna()
         world_data.append(values)
 
-    ax1.boxplot(world_data, tick_labels=[str(int(x)) for x in world_values])
+    plt.boxplot(world_data, tick_labels=[str(int(x)) for x in world_values])
 
     # Agregar mediana encima de cada boxplot
     for i, values in enumerate(world_data, start=1):
@@ -509,33 +509,16 @@ def plot_g3(df):
             continue
 
         median = values.median()
-        ax1.text(
+        plt.text(
             i, median + 1.5, f"{median:.2f} s", ha="center", va="bottom", fontsize=10
         )
 
-    ax1.set_xlabel("Cantidad de Diamantes")
-    ax1.set_ylabel("Tiempo de Traducción (s)")
-    ax1.set_title("G3A: Tiempo de Traducción según Tamaño Modal")
-    ax1.grid(True, axis="y", alpha=0.3)
+    plt.xlabel("Cantidad de Diamantes")
+    plt.ylabel("Tiempo de Traducción (s)")
+    plt.title("G3A: Tiempo de Traducción según Tamaño Modal")
+    plt.grid(True, axis="y", alpha=0.3)
 
-    # ---------------------------------------------------------------
-    # G3B: CAJAS VS TIEMPO DE TRADUCCIÓN
-    # ---------------------------------------------------------------
-
-    ax2.scatter(
-        df["boxes"],
-        df["translation_time"],
-        color="orange",
-        alpha=0.5,
-        edgecolor="k",
-        marker="^",
-    )
-
-    ax2.set_xlabel("Cantidad de Cajas")
-    ax2.set_ylabel("Tiempo de Traducción (s)")
-    ax2.set_title("G3B: Cajas vs Tiempo de Traducción")
-    ax2.grid(True, alpha=0.3)
-    fig.suptitle("G3: Impacto de los Operadores Modales sobre el Parser")
+    plt.suptitle("G3: Impacto de los Operadores Modales sobre el Parser")
     plt.tight_layout()
 
 
