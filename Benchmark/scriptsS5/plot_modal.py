@@ -175,8 +175,8 @@ def plot_t1(decided_w, active_buckets, rm_groups):
                 )
 
         ax.axhline(0.5, color="black", linestyle="--", linewidth=1)
-        ax.set_title(f"Mundos {bucket}")
-        ax.set_xlabel("Densidad Proposicional (Ratio M/N)")
+        ax.set_title(f"Worlds {bucket}")
+        ax.set_xlabel("Propositional Density (Ratio M/N)")
         ax.set_ylim(-0.05, 1.05)
         ax.grid(True, alpha=0.3)
         ax.legend(loc="best", fontsize=8)
@@ -184,9 +184,9 @@ def plot_t1(decided_w, active_buckets, rm_groups):
     for ax in axes[len(active_buckets) :]:
         ax.set_visible(False)
 
-    axes[0].set_ylabel("Probabilidad de ser SAT (P(SAT))")
+    axes[0].set_ylabel("Probability of being SAT (P(SAT))")
     fig.suptitle(
-        "T1: Curva de transición SAT/UNSAT por Cantidad de Mundos", fontsize=14
+        "T1: Transition curve SAT/UNSAT for amount of worlds", fontsize=14
     )
     plt.tight_layout()
 
@@ -222,7 +222,7 @@ def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
                 marker=st["marker"],
                 linestyle=st["linestyle"],
                 color=st["color"],
-                label=f"Diam/Cajas = {rm}",
+                label=f"Diam/Boxes = {rm}",
             )
             frac = get_sat_fraction(rm_df)
             threshold = interpolate_threshold(frac)
@@ -235,8 +235,8 @@ def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
                     linewidth=1.5,
                     alpha=0.7,
                 )
-        ax.set_title(f"Mundos {bucket}")
-        ax.set_xlabel("Ratio proposicional (M/N)")
+        ax.set_title(f"Worlds {bucket}")
+        ax.set_xlabel("Propositional Ratio (M/N)")
         ax.set_yscale("log")
         ax.grid(True, alpha=0.3)
         ax.legend(loc="upper left", fontsize=8)
@@ -247,7 +247,7 @@ def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
 
 
 # ===================================================================
-# T3: HOODS BY SIZE OF MODEL
+# T3: BEllS BY SIZE OF MODEL
 # ===================================================================
 def plot_t3(decided_w, active_buckets, time_column, title):
 
@@ -278,14 +278,14 @@ def plot_t3(decided_w, active_buckets, time_column, title):
                 threshold, color=st["color"], linestyle=":", linewidth=2, alpha=0.8
             )
 
-    plt.xlabel("Densidad Proposicional (Ratio M/N)")
+    plt.xlabel("Propositional Density (Ratio M/N)")
     if time_column == "z3_time":
-        plt.ylabel("Tiempo Mediano (Z3, s)")
+        plt.ylabel("Median Time (Z3, s)")
     else:
-        plt.ylabel("Tiempo Mediano (TOTAL, s)")
+        plt.ylabel("Median Time (TOTAL, s)")
     plt.yscale("log")
     plt.title(title)
-    plt.legend(title="Mundos Reales", bbox_to_anchor=(1.05, 1), loc="upper left")
+    plt.legend(title="Real Worlds", bbox_to_anchor=(1.05, 1), loc="upper left")
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
@@ -340,7 +340,7 @@ def plot_t5(decided_w, active_buckets, time_column, title, zlabel):
 
         ax.set_title(f"{bucket}")
         ax.set_xlabel("Ratio M/N", labelpad=8)
-        ax.set_ylabel("Diam/Cajas", labelpad=8)
+        ax.set_ylabel("Diam/Boxes", labelpad=8)
         ax.set_zlabel(zlabel, labelpad=8)
         ax.view_init(elev=25, azim=135)
 
@@ -383,7 +383,7 @@ def plot_t6(decided_w, active_buckets):
         s=100,
         zorder=5,
         edgecolors="black",
-        label="Thresholds Empíricos",
+        label="Empirical Thresholds",
     )
 
     coefs = np.polyfit(x_worlds, y_thresholds, 1)
@@ -398,16 +398,16 @@ def plot_t6(decided_w, active_buckets):
         linestyle="--",
         linewidth=2,
         label=(
-            f"Ajuste Lineal "
+            f"Linear Fot "
             f"($R^2={r_squared:.2f}$)\n"
             f"$Ratio = {m_coef:.4f}"
             f"\\times W + {b_coef:.2f}$"
         ),
     )
 
-    plt.xlabel("Cantidad Promedio de Mundos ($W$)")
-    plt.ylabel("Ratio Crítico " "(Umbral $P(SAT) = 0.5$)")
-    plt.title("T6: Relación Matemática entre Mundos y Transición de Fase")
+    plt.xlabel("Average number of worlds ($W$)")
+    plt.ylabel("Critical Ratio " "(Threshold $P(SAT) = 0.5$)")
+    plt.title("T6: Mathematical Relationship Between Worlds and Phase Transition")
     plt.legend()
     plt.grid(True, linestyle=":", alpha=0.6)
     plt.tight_layout()
@@ -440,15 +440,15 @@ def plot_g1(df):
         edgecolor="k",
         marker="s",
     )
-    plt.xlabel("Tiempo de Z3 (segundos)")
-    plt.ylabel("Tiempo de Traducción en Python (segundos)")
-    plt.title("G1: Cuello de Botella (Traducción vs Resolución)")
+    plt.xlabel("Time of Z3 (segundos)")
+    plt.ylabel("Time of translate on Python (seconds)")
+    plt.title("G1: Bottleneck (Translate vs Resolution)")
     plt.axvline(
         x=df["z3_time"].median(),
         color="gray",
         linestyle="--",
         alpha=0.7,
-        label="Mediana Z3",
+        label="Median Z3",
     )
     plt.legend()
     plt.grid(True, alpha=0.3)
@@ -466,18 +466,18 @@ def plot_g2(df):
         df_sorted["translation_time"].rolling(window).mean(),
         color="purple",
         linewidth=3,
-        label="Tiempo de Traducción (Tendencia)",
+        label="Time of Translate (Trend)",
     )
     plt.plot(
         df_sorted["size"] / 1024,
         df_sorted["z3_time"].rolling(window).mean(),
         color="green",
         linewidth=3,
-        label="Tiempo de Z3 (Tendencia)",
+        label="Time of Z3 (Trend)",
     )
-    plt.xlabel("Tamaño de la Fórmula en KB (Fricción de Memoria)")
-    plt.ylabel("Tiempo Promedio (segundos)")
-    plt.title("G2: Escalamiento del Tiempo respecto al Peso de la Fórmula")
+    plt.xlabel("Formula Size in KB (Memory Friction)")
+    plt.ylabel("Average Time (seconds)")
+    plt.title("G2: Time Scaling Based on Formula Weight")
     plt.legend()
     plt.grid(True, alpha=0.3)
 
@@ -509,12 +509,12 @@ def plot_g3(df):
             i, median + 1.5, f"{median:.2f} s", ha="center", va="bottom", fontsize=10
         )
 
-    plt.xlabel("Cantidad de Diamantes")
-    plt.ylabel("Tiempo de Traducción (s)")
-    plt.title("G3A: Tiempo de Traducción según Tamaño Modal")
+    plt.xlabel("Amount Diamonds")
+    plt.ylabel("Time of translate (seconds)")
+    plt.title("G3A: Translation Time Based on Modal Size")
     plt.grid(True, axis="y", alpha=0.3)
 
-    plt.suptitle("G3: Impacto de los Operadores Modales sobre el Parser")
+    plt.suptitle("G3: Impact of Modal Operators on the Parser")
     plt.tight_layout()
 
 
@@ -539,9 +539,9 @@ def plot_g4(df):
     plt.scatter(
         df["ratio"], df["z3_time"], color="green", alpha=0.5, edgecolor="k", label="Z3"
     )
-    plt.xlabel("Ratio Proposicional (m/n)")
-    plt.ylabel("Tiempo (s)")
-    plt.title("G4A: Impacto del Ratio Proposicional")
+    plt.xlabel("Propositional Ratio (m/n)")
+    plt.ylabel("Time (s)")
+    plt.title("G4A: Impact by Proposicional Ratio")
     plt.legend()
     plt.grid(True, alpha=0.3)
 
@@ -554,7 +554,7 @@ def plot_g4(df):
 def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
 
     print("\n" + "=" * 80)
-    print("=== MEGA-REPORTE: ANATOMÍA Z3 Y CUELLOS DE BOTELLA ===")
+    print("=== MEGA-REPORT: ANATOMY Z3 AND BOTTLENECKS ===")
     print("=" * 80)
 
     for n in n_values:
@@ -563,7 +563,7 @@ def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
         if n_df.empty:
             continue
 
-        print(f"\n--- Resultados Z3 para n = {n} ---")
+        print(f"\n--- RESULTS OF Z3 FOR n = {n} ---")
 
         grouped = (
             n_df.groupby("ratio")
@@ -578,22 +578,22 @@ def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
         peak = grouped.loc[grouped["median_time"].idxmax()]
 
         print(
-            f" Pico Central -> "
-            f"Ratio Crítico: {peak['ratio']:.2f} | "
-            f"Tiempo Z3: {peak['median_time']:.4f} s "
+            f" Central Peack -> "
+            f"Critical Ratio: {peak['ratio']:.2f} | "
+            f"Time Z3: {peak['median_time']:.4f} s "
             f"(Diam: {peak['avg_diamonds']:.0f}, "
-            f"Cajas: {peak['avg_boxes']:.0f})"
+            f"Boxes: {peak['avg_boxes']:.0f})"
         )
 
     if len(x_worlds) > 1:
         print(
-            f"\n[ ECUACIÓN S5 ] "
+            f"\n[ EQUATION S5 ] "
             f"r = {m_coef:.4f} * W + "
             f"{b_coef:.4f} "
             f"(R2={r_squared:.4f})"
         )
 
-    print("\n--- Correlaciones de Cuello de Botella " "(1.0 = impacto directo) ---")
+    print("\n--- Bottleneck Correlations (1.0 = direct impact) ---")
 
     columnas_corr = [
         "size",
@@ -610,7 +610,7 @@ def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
 
     correlaciones = df[columnas_corr].corr()
 
-    print("Factores que destruyen la memoria de Python " "(Traducción):")
+    print("Factors that destroy Python memory " "(Translate):")
 
     for index, value in (
         correlaciones["translation_time"]
@@ -620,7 +620,7 @@ def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
 
         print(f"  - {index.ljust(15)}: " f"{value:.3f}")
 
-    print("\nFactores que ralentizan el algoritmo lógico " "(Z3):")
+    print("\nFactors that destroy Python memory " "(Z3):")
 
     for index, value in (
         correlaciones["z3_time"].drop(["translation_time", "z3_time", "time"]).items()
@@ -629,7 +629,7 @@ def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
         print(f"  - {index.ljust(15)}: " f"{value:.3f}")
 
     print("\n" + "=" * 80)
-    print("=== TOP 30 FÓRMULAS CON PEOR CUELLO DE BOTELLA ===")
+    print("=== TOP 30 FORMULAS WITH THE WORST BOTTLENECKS ===")
     print("=" * 80)
 
     top_ineficientes = df.sort_values("overhead_ratio", ascending=False).head(30)
@@ -711,15 +711,15 @@ def main():
         world_panels,
         rm_groups,
         "z3_time",
-        "T2-Z3: Dificultad Z3 por mundos y relación modal",
-        "Tiempo mediano (Z3, s)",
+        "T2-Z3: Z3 difficulty by world and modal relationship",
+        "Median Time (Z3, s)",
     )
 
     # ---------------------------------------------------------------
     # T3 Z3
     # ---------------------------------------------------------------
     plot_t3(
-        decided_w, active_buckets, "z3_time", "T3-Z3: Campanas y Thresholds (Z3 Time)"
+        decided_w, active_buckets, "z3_time", "T3-Z3: Bells and Thresholds (Z3 Time)"
     )
 
     # ---------------------------------------------------------------
@@ -729,8 +729,8 @@ def main():
         decided_w,
         active_buckets,
         "z3_time",
-        "T5-Z3: Montaña 3D de Complejidad (Z3 Time)",
-        "Mediana (Z3, s)",
+        "T5-Z3: Complexity of mountain 3D (Z3 Time)",
+        "Median (Z3, s)",
     )
 
     # ---------------------------------------------------------------
@@ -765,8 +765,8 @@ def main():
         world_panels,
         rm_groups,
         "time",
-        "T2-TOTAL: Dificultad (incluyendo overhead de Python)",
-        "Tiempo mediano (TOTAL, s)",
+        "T2-TOTAL: Difficulty (including overhead of Python)",
+        "Median Time (TOTAL, s)",
     )
 
     # ---------------------------------------------------------------
@@ -776,7 +776,7 @@ def main():
         decided_w,
         active_buckets,
         "time",
-        "T3-TOTAL: Campanas Deformadas por el Parser (Total Time)",
+        "T3-TOTAL: Bells Deformed by the Parser (Total Time)",
     )
 
     # ---------------------------------------------------------------
@@ -786,8 +786,8 @@ def main():
         decided_w,
         active_buckets,
         "time",
-        "T5-TOTAL: Montaña 3D (Z3 + Python Overhead)",
-        "Mediana (TOTAL, s)",
+        "T5-TOTAL: Mountain 3D (Z3 + Python Overhead)",
+        "Median (TOTAL, s)",
     )
     plot_g1(df)
     plot_g2(df)
