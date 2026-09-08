@@ -129,7 +129,7 @@ def prepare_world_buckets(decided):
 
 
 # ===================================================================
-# T1: CURVA DE TRANSICIÓN SAT/UNSAT
+# T1: TRANSITION CURVE SAT/UNSAT
 # ===================================================================
 
 
@@ -192,7 +192,7 @@ def plot_t1(decided_w, active_buckets, rm_groups):
 
 
 # ===================================================================
-# T2: CAMPANA DE DIFICULTAD
+# T2: DIFFICULTY CURVE
 # ===================================================================
 def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
 
@@ -247,7 +247,7 @@ def plot_t2(decided_w, world_panels, rm_groups, time_column, title, ylabel):
 
 
 # ===================================================================
-# T3: CAMPANAS POR TAMAÑO DE MODELO
+# T3: HOODS BY SIZE OF MODEL
 # ===================================================================
 def plot_t3(decided_w, active_buckets, time_column, title):
 
@@ -291,7 +291,7 @@ def plot_t3(decided_w, active_buckets, time_column, title):
 
 
 # ===================================================================
-# T5: MONTAÑA 3D
+# T5: MOUNTAIN 3D
 # ===================================================================
 def plot_t5(decided_w, active_buckets, time_column, title, zlabel):
 
@@ -352,7 +352,7 @@ def plot_t5(decided_w, active_buckets, time_column, title, zlabel):
 
 
 # ===================================================================
-# T6: ECUACIÓN DE TRANSICIÓN DE FASE
+# T6: PHASE TRANSITION EQUATION
 # ===================================================================
 def plot_t6(decided_w, active_buckets):
 
@@ -416,7 +416,7 @@ def plot_t6(decided_w, active_buckets):
 
 
 # ===================================================================
-# G1: DISPERSIÓN
+# G1: DISPERSION
 # ===================================================================
 def plot_g1(df):
 
@@ -455,7 +455,7 @@ def plot_g1(df):
 
 
 # ===================================================================
-# G2: ESCALAMIENTO POR TAMAÑO
+# G2: SCALING BY SIZE
 # ===================================================================
 def plot_g2(df):
     plt.figure(figsize=(10, 6))
@@ -483,15 +483,11 @@ def plot_g2(df):
 
 
 # ===================================================================
-# G3: DIAMANTES VS CAJAS
+# G3: DIAMONDS VS BOXES
 # ===================================================================
 def plot_g3(df):
 
     plt.figure(figsize=(14, 6))
-
-    # ---------------------------------------------------------------
-    # G3A: MUNDOS / DIAMANTES
-    # ---------------------------------------------------------------
 
     world_data = []
     world_values = sorted(df["diamonds"].dropna().unique())
@@ -502,7 +498,7 @@ def plot_g3(df):
 
     plt.boxplot(world_data, tick_labels=[str(int(x)) for x in world_values])
 
-    # Agregar mediana encima de cada boxplot
+    # Add median above each boxplot
     for i, values in enumerate(world_data, start=1):
 
         if len(values) == 0:
@@ -523,7 +519,7 @@ def plot_g3(df):
 
 
 # ===================================================================
-# G4: IMPACTO DE RATIOS
+# G4: IMPACT OF RATIOS
 # ===================================================================
 def plot_g4(df):
 
@@ -553,7 +549,7 @@ def plot_g4(df):
 
 
 # ===================================================================
-# REPORTE EN CONSOLA
+# CONSOLE REPORT
 # ===================================================================
 def print_report(df, n_values, x_worlds, m_coef, b_coef, r_squared):
 
@@ -674,7 +670,7 @@ def main():
     args = parser.parse_args()
 
     # ---------------------------------------------------------------
-    # Cargar datos
+    # Load data
     # ---------------------------------------------------------------
 
     df = load_data(include_other=args.all)
@@ -684,7 +680,7 @@ def main():
         sys.exit(1)
 
     # ---------------------------------------------------------------
-    # Limpiar datos
+    # Clean data
     # ---------------------------------------------------------------
 
     df = clean_data(df)
@@ -692,7 +688,7 @@ def main():
     n_values = sorted(df["n"].unique())
 
     # ---------------------------------------------------------------
-    # Datos principales
+    # Data main
     # ---------------------------------------------------------------
 
     n_target = max(n_values)
@@ -743,7 +739,7 @@ def main():
     result_t6 = plot_t6(decided_w, active_buckets)
     if result_t6[0] is not None:
         m_coef, b_coef, r_squared = result_t6
-        # Recuperar los valores utilizados para el reporte
+        # Data recovered for report
         x_worlds = []
         y_thresholds = []
         for bucket in active_buckets:
