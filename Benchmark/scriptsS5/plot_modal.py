@@ -528,10 +528,10 @@ def plot_g3(df):
 def plot_g4(df):
 
     df_plot_modal = df[df["modal_ratio"] < 900]
-    fig, (ax3, ax4) = plt.subplots(1, 2, figsize=(14, 6))
+    plt.figure(figsize=(14, 6))
 
     # G4A
-    ax3.scatter(
+    plt.scatter(
         df["ratio"],
         df["translation_time"],
         color="purple",
@@ -540,39 +540,14 @@ def plot_g4(df):
         label="Traducción",
     )
 
-    ax3.scatter(
+    plt.scatter(
         df["ratio"], df["z3_time"], color="green", alpha=0.5, edgecolor="k", label="Z3"
     )
-    ax3.set_xlabel("Ratio Proposicional (m/n)")
-    ax3.set_ylabel("Tiempo (s)")
-    ax3.set_title("G4A: Impacto del Ratio Proposicional")
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-
-    # G4B
-    ax4.scatter(
-        df_plot_modal["modal_ratio"],
-        df_plot_modal["translation_time"],
-        color="purple",
-        alpha=0.5,
-        edgecolor="k",
-        label="Traducción",
-    )
-
-    ax4.scatter(
-        df_plot_modal["modal_ratio"],
-        df_plot_modal["z3_time"],
-        color="green",
-        alpha=0.5,
-        edgecolor="k",
-        label="Z3",
-    )
-
-    ax4.set_xlabel("Ratio Modal (Diamantes / Cajas)")
-    ax4.set_ylabel("Tiempo (s)")
-    ax4.set_title("G4B: Impacto del Ratio Modal")
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
+    plt.xlabel("Ratio Proposicional (m/n)")
+    plt.ylabel("Tiempo (s)")
+    plt.title("G4A: Impacto del Ratio Proposicional")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
 
     plt.tight_layout()
 
