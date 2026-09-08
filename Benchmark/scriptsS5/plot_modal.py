@@ -398,7 +398,7 @@ def plot_t6(decided_w, active_buckets):
         linestyle="--",
         linewidth=2,
         label=(
-            f"Linear Fot "
+            f"Linear Fit "
             f"($R^2={r_squared:.2f}$)\n"
             f"$Ratio = {m_coef:.4f}"
             f"\\times W + {b_coef:.2f}$"
@@ -533,7 +533,7 @@ def plot_g4(df):
         color="purple",
         alpha=0.5,
         edgecolor="k",
-        label="Traducción",
+        label="Translate",
     )
 
     plt.scatter(
@@ -541,7 +541,7 @@ def plot_g4(df):
     )
     plt.xlabel("Propositional Ratio (m/n)")
     plt.ylabel("Time (s)")
-    plt.title("G4A: Impact by Proposicional Ratio")
+    plt.title("G4A: Impact by Propositional Ratio")
     plt.legend()
     plt.grid(True, alpha=0.3)
 
