@@ -392,7 +392,7 @@ if __name__ == "__main__" :
     parser.add_argument("-f", "--file", dest="file", type=validate_file,
                         help="the file with the formula", metavar="FILE")
     parser.add_argument("-i", "--inline", dest="form", help="takes a formula as inline input", metavar="FORMULA")
-    parser.add_argument("-m", "--method", dest="method", choices=["new", "old", "pseu"], default="new", help="choose the translation method")
+    parser.add_argument("-m", "--method", dest="method", choices=["basic-opt", "old", "incremental"], default="basic-opt", help="choose the translation method")
     args = parser.parse_args()
     
     if args.verbose :
@@ -400,23 +400,23 @@ if __name__ == "__main__" :
     if args.form :
         problem = args.form
         parsed_form = khparser.parse(problem)
-        if args.method == "new":
+        if args.method == "basic-opt":
             translate_s5_optimized_lu(parsed_form)
         elif args.method == "old":
             translate_s5_optimized(parsed_form)
-        elif args.method == "pseu":
-            solver(parsed_form)
+        elif args.method == "incremental":
+            solver(parsed_form, verbose)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
             problem = file.read()
             parsed_form = khparser.parse(problem)
-            if args.method == "new":
+            if args.method == "basic-opt":
                 translate_s5_optimized_lu(parsed_form)
             elif args.method == "old":
                 translate_s5_optimized(parsed_form)
-            elif args.method == "pseu":
-                solver(parsed_form)
+            elif args.method == "incremental":
+                solver(parsed_form, verbose)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)

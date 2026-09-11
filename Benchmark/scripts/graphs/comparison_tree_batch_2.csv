@@ -1,0 +1,9 @@
+form,pos,neg,time_basic_opt,result_basic_opt,time_incremental,result_incremental,fastest
+formula15,14,1,300,TO,18.64417780000076,UNSAT,incremental
+formula15,14,1,300,TO,20.095030500000576,UNSAT,incremental
+formula15,14,1,300,TO,19.930883500001073,UNSAT,incremental
+formula15,14,1,300,TO,19.83325749999858,UNSAT,incremental
+formula15,14,1,300,TO,20.6197061999992,UNSAT,incremental
+formula15,14,1,300,TO,19.44337540000197,UNSAT,incremental
+formula15,14,1,300,TO,20.692837299997336,UNSAT,incremental
+formula15,14,1,300,TO,16.83487840000089,UNSAT,incremental

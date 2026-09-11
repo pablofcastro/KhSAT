@@ -5,45 +5,21 @@ from z3 import *
 import argparse, os
 import Kh.parser_kh as khparser
 from collections import deque
+import datetime
+from logger_and_extra_incremental import *
 
 verbose = False
 
-def validate_file(f):
-    if not os.path.exists(f):
-        raise argparse.ArgumentTypeError(f"Couldn't find {f}.")
-    return f
-
-def print_matrix(M_x, M_pre, M_post):
-    print("\n=== Matrix M_x ===")
-    header = "\t" + "\t".join(str(post) for post in M_post)
-    print(header)
-    for pre in M_pre:
-        row = str(pre) + "\t"
-        row += "\t".join("T" if M_x[str(pre)][str(post)] == True else "." for post in M_post)
-        print(row)
-    print("==================\n")
-
-def print_M(M):
-    print("\n=== M (existential pairs) ===")
-    for (pre, post) in M:
-        print(f"  ({pre}, {post})")
-    print("=============================\n")
-
-def print_stack(stack):
-    print("\n=== Stack ===")
-    for (type, j, g_prev) in stack:
-        print(f"  (type={type}, j={j}, G_prev={g_prev})")
-    print("=============\n")
-
-
-
-def backtracking(G, M, universal_pre, stack, positives):
+def backtracking(G, M, universal_pre, stack, positives, forced_existential, target_idx=None):
     """
     Performs backtracking over the positive formulas' decision tree (Kh(A_j, B_j) = Box(~A_j) v Diamond(B_j)).
     
     Unwinds the stack to find the last 'universal' choice, attempts to switch it to 
     'existential', and checks S5-satisfiability with Z3. If valid, updates state (G, M) 
     to resume; otherwise, continues popping or returns UNSAT if exhausted.
+    
+    If target_idx is provided, it skips attempting existential branches for any j > target_idx
+    to effectively backjump directly to target_idx.
     """
     
     while stack:
@@ -54,25 +30,30 @@ def backtracking(G, M, universal_pre, stack, positives):
         pair_j = (pre_j, post_j)
 
         if (type == "universal"):
-            universal_pre.pop()
+            # Remove j from the (alpha, [indices]) entry; delete entry if list becomes empty
+            existing = next((entry for entry in universal_pre if str(entry[0]) == str(pre_j)), None)
+            if existing is not None:
+                if j in existing[1]:
+                    existing[1].remove(j)
+                if not existing[1]:
+                    universal_pre.remove(existing)
+
+            if target_idx is not None and j > target_idx:
+                # We want to backjump further down; skip trying existential here
+                continue
+
             g_existential = astkh.And(g_prev, astkh.Diamond(post_j))
             z3_model = s5solver.get_model(g_existential)
             result = z3_model.check()
             if result == sat:
-                stack.append(("existential", j, g_prev))
-                M.append(pair_j)
-                G = g_existential
-                if (verbose) :
-                    print(f"\n[Backtracking] Found SAT with existential for j={j}, G={G}")
-                    print_M(M)
-                    print_stack(stack)
+                G = apply_existential_choice(j, g_prev, g_existential, pair_j, stack, M)
                 return j, G, M, universal_pre
         else:
             M.pop()
 
     return "UNSAT", None, None, None
 
-def build_G(positives, pos, G, M, universal_pre, stack):
+def build_G(positives, pos, G, M, universal_pre, stack, log_file, forced_existential=None, verbose=False):
     """
     Iteratively processes positive formulas from index `pos` to construct the global formula G.
 
@@ -80,6 +61,11 @@ def build_G(positives, pos, G, M, universal_pre, stack):
     If unsatisfiable, it attempts the existential choice Diamond(B_i). If both fail,
     it invokes backtracking to unwind previous choices and find a satisfiable state.
     """
+    if verbose: 
+        log(log_file, f"\n[build_G] Starting from pos={pos}, current G={G}")
+
+    if forced_existential is None:
+        forced_existential = []
 
     length_positives = len(positives)
     i = pos
@@ -90,53 +76,69 @@ def build_G(positives, pos, G, M, universal_pre, stack):
         post_i = kh.right
         pair_i = (pre_i, post_i)
 
-        # Attempt universal branch: G ∧ A(~ φ_i)
-        g_universal = astkh.And(G, astkh.Box(astkh.Not(pre_i)))
-        z3_model = s5solver.get_model(g_universal)
-        result = z3_model.check()
-        if result == sat:
-            stack.append(("universal", i, G))
-            universal_pre.append(pre_i)
-            G = g_universal
-            if (verbose) :
-                print(f"\n[build_G] i={i}, chose UNIVERSAL, G={G}")
-                print_stack(stack)
-            i += 1
+        if i in forced_existential:
+            # This atom is forced to be existential; skip the universal branch entirely
+            if verbose: log(log_file, f"  [build_G] i={i} Kh({pre_i},{post_i}) -> FORCED EXISTENTIAL")
 
-        else:
-            # Universal branch failed; attempt existential branch: G ∧ E(ψ_i)
             g_existential = astkh.And(G, astkh.Diamond(post_i))
             z3_model = s5solver.get_model(g_existential)
             result = z3_model.check()
-            if result == sat:
-                stack.append(("existential", i, G))
-                M.append(pair_i)
-                G = g_existential
-                if (verbose) :
-                    print(f"\n[build_G] i={i}, chose EXISTENTIAL, G={G}")
-                    print_M(M)
-                    print_stack(stack)
-                i += 1
 
+            if result == sat:
+                G = apply_existential_choice(i, G, g_existential, pair_i, stack, M, log_file, f"    -> SAT, G={g_existential}", verbose)
+                i += 1
             else:
-                # Both choices failed for current formula; invoke backtracking
-                if (verbose) :
-                    print(f"\n[build_G] i={i}, both UNSAT, invoking backtracking...")
-                status, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives)
+                # Forced existential UNSAT; backtrack
+                if verbose: log(log_file, f"    -> UNSAT even as forced existential, backtracking...")
+                
+                status, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives, forced_existential)
+
                 if status == "UNSAT":
-                    return "UNSAT"
+                    return "UNSAT", None, None, None, None, None
                 else:
+                    if verbose: log(log_file, f"  [build_G] backtrack to j={status}, new G={G_new}")
                     G = G_new
                     M = M_new
                     universal_pre = universal_pre_new
                     i = status + 1
 
+        else:
+            # Attempt universal branch: G ∧ A(~ φ_i)
+            g_universal = astkh.And(G, astkh.Box(astkh.Not(pre_i)))
+            z3_model = s5solver.get_model(g_universal)
+            result = z3_model.check()
+            if result == sat:
+                G = apply_universal_choice(i, G, g_universal, pre_i, stack, universal_pre, log_file, f"  [build_G] i={i} Kh({pre_i},{post_i}) -> UNIVERSAL, G={g_universal}", verbose)
+                i += 1
+
+            else:
+                # Universal branch failed; attempt existential branch: G ∧ E(ψ_i)
+                g_existential = astkh.And(G, astkh.Diamond(post_i))
+                z3_model = s5solver.get_model(g_existential)
+                result = z3_model.check()
+                if result == sat:
+                    G = apply_existential_choice(i, G, g_existential, pair_i, stack, M, log_file, f"  [build_G] i={i} Kh({pre_i},{post_i}) -> EXISTENTIAL, G={g_existential}", verbose)
+                    i += 1
+
+                else:
+                    # Both choices failed for current formula; invoke backtracking
+                    if (verbose): log(log_file, f"  [build_G] i={i} Kh({pre_i},{post_i}) -> both UNSAT, backtracking...")
+                    status, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives, forced_existential)
+                    if status == "UNSAT":
+                        return "UNSAT", None, None, None, None, None
+                    else:
+                        if (verbose) :
+                            log(log_file, f"  [build_G] backtrack to j={status}, new G={G_new}")
+                        G = G_new
+                        M = M_new
+                        universal_pre = universal_pre_new
+                        i = status + 1
+
     # Successfully constructed G for all positive clauses
     if (verbose) :
-        print(f"\n[build_G] Finished. Final G={G}")
-        print_M(M)
-        print_stack(stack)
-    return G, M, universal_pre, stack
+        log(log_file, f"\n[build_G] Finished. Final G={G}")
+
+    return "OK", G, M, universal_pre, stack, forced_existential
 
 def get_pre_post_conditions(M):
     """
@@ -152,10 +154,121 @@ def get_pre_post_conditions(M):
             M_post.append(post)
     return M_pre, M_post
 
-def build_matrix(M, M_pre, M_post):
+def get_problematics(negatives, M_pre, M_post, G, log_file, verbose=False):
+    """
+    Evaluates problematic pre and post-conditions for negative formulas.
+
+    """
+    if verbose:
+        log(log_file, f"\n[get_problematics] Starting")
+    map_prob = {}
+
+    for nkh in negatives:
+        phi = nkh.left
+        psi = nkh.right
+        
+        key = (str(phi), str(psi))
+
+        if verbose:
+            phi_str = getattr(getattr(phi, 'name', phi), 'value', str(phi))
+            psi_str = getattr(getattr(psi, 'name', psi), 'value', str(psi))
+            log(log_file, f"\n[get_problematics] Processing ~Kh({phi_str}, {psi_str})")
+
+        # Step 1: Problematic pre-conditions analysis
+        pre_prob = []
+        for alpha in M_pre:
+            g_check = astkh.And(G, astkh.Diamond(astkh.And(phi, astkh.Not(alpha))))
+            z3_model = s5solver.get_model(g_check)
+            if z3_model.check() != sat:
+                pre_prob.append(alpha)
+
+        if verbose:
+            log(log_file, f"  pre_prob: {[getattr(getattr(a, 'name', a), 'value', str(a)) for a in pre_prob]}")
+
+        # Early exit
+        if not pre_prob:
+            if verbose:
+                log(log_file, "  No problematic pres, skipping post analysis for this negative.")
+            continue
+
+        # Step 2: Problematic post-conditions analysis
+        post_prob = []
+        for beta in M_post:
+            g_check = astkh.And(G, astkh.Diamond(astkh.And(beta, astkh.Not(psi))))
+            z3_model = s5solver.get_model(g_check)
+            if z3_model.check() != sat:
+                post_prob.append(beta)
+
+        if verbose:
+            log(log_file, f"  post_prob: {[getattr(getattr(b, 'name', b), 'value', str(b)) for b in post_prob]}")
+
+        # Early exit
+        if not post_prob:
+            if verbose:
+                log(log_file, "  No problematic posts for this negative.")
+            continue
+
+
+        map_prob[key] = (pre_prob, post_prob)
+
+    return map_prob if map_prob else "SAT"
+
+def check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential=None, verbose=False):
+    """
+    Checks if universal preconditions in universal_pre are compatible with the negative formulas under G.
+    """
+
+    if verbose: 
+        log(log_file, f"\n[check_universal_preconditions] Starting")
+
+    if forced_existential is None:
+        forced_existential = []
+
+    for idx_neg, nkh in enumerate(negatives):
+        phi = nkh.left
+        phi_clean = getattr(phi, 'value', str(phi))
+        
+        for idx_pre, (alpha, alpha_indices) in enumerate(universal_pre):
+            alpha_clean = getattr(alpha, 'value', str(alpha))
+            
+            g_check = astkh.And(G, astkh.Diamond(astkh.And(phi, astkh.Not(alpha))))
+
+            if verbose: 
+                log(log_file, f"  Checking negatives[{idx_neg}] = {phi_clean}, universal_pre[{idx_pre}] = {alpha_clean} | G /\\ E({phi_clean} /\\ ~{alpha_clean})")
+            
+            z3_model = s5solver.get_model(g_check)
+            result = z3_model.check()
+            if verbose: 
+                log(log_file, f"    Result: {'SAT' if result == sat else 'UNSAT'}")
+            
+            if result != sat:
+                # Register all positive indices that had alpha as universal precondition as forced existential
+                for fi in alpha_indices:
+                    if fi not in forced_existential:
+                        forced_existential.append(fi)
+                target_idx = min(alpha_indices)
+
+                if verbose: 
+                    log(log_file, f"  -> Conflict detected: ({phi_clean}) implies ({alpha_clean})")
+                    log(log_file, f"     Forced existential: {forced_existential}, backjumping to <= {target_idx}")
+
+                backtrack_res = backtracking(G, M, universal_pre, stack, positives, forced_existential, target_idx)
+
+                if backtrack_res[0] == "UNSAT":
+                    return "UNSAT", None, None, None, None, forced_existential
+                else:
+                    j, G_new, M_new, universal_pre_new = backtrack_res
+                    return "BACKTRACK", G_new, M_new, universal_pre_new, j + 1, forced_existential
+                    
+    return "OK", G, M, universal_pre, pos, forced_existential
+
+def build_matrix(M, M_pre, M_post, log_file, verbose=False):
     """
     Initializes the matrix representation M_x mapping preconditions to postconditions.
     """
+
+    if verbose:
+        log(log_file, f"\n[build_matrix] Starting")
 
     M_x = {}
     for pre in M_pre:
@@ -168,7 +281,7 @@ def build_matrix(M, M_pre, M_post):
         M_x[str(pre)][str(post)] = True
     return M_x
 
-def complete_matrix(G, M, M_pre, M_post, M_x):
+def complete_matrix(G, M, M_pre, M_post, M_x, log_file, verbose=False):
     """
     Completes matrix M_x by computing semantic implications under G
     and transitively propagating reachability via a worklist queue.
@@ -223,86 +336,66 @@ def complete_matrix(G, M, M_pre, M_post, M_x):
                                     if phi_str not in depends[phi_segunda_str]:
                                         depends[phi_segunda_str].add(phi_str)
 
+    if (verbose) :
+        log(log_file, "[complete_matrix] Matrix after completion:")
+        log_matrix(log_file, M_x, M_pre, M_post)
+
     return M_x
 
-def check_negatives(negatives, G, M_pre, M_post, M_x, stack, positives, M, universal_pre):
+def check_negatives(negatives, G, M_x, stack, positives, M, universal_pre, map_prob, log_file, forced_existential=None, verbose=False):
     """
     Validates negative formulas ~Kh(φ_i, ψ_i) against current choices in G and matrix M_x.
-
-    Checks whether universal preconditions in G or an active witness plan in M_x 
-    prove kh(φ_i, ψ_i), contradicting the required negative ~kh(φ_i, ψ_i).
     """
+    if verbose:
+        log(log_file, f"\n[check_negatives] Starting")
 
+    if forced_existential is None:
+        forced_existential = []
     for nkh in negatives:
         phi = nkh.left
         psi = nkh.right
 
-        if (verbose) :
-            print(f"\n[check_negatives] Processing ~Kh({phi}, {psi})")
+        if verbose:
+            phi_str = getattr(getattr(phi, 'name', phi), 'value', str(phi))
+            psi_str = getattr(getattr(psi, 'name', psi), 'value', str(psi))
+            log(log_file, f"\n[check_negatives] Processing ~Kh({phi_str}, {psi_str})")
+
+        # Check path in matrix using problematics map
+
+        key = (str(phi), str(psi))
+        prob_pair = map_prob.get(key)
         
-        # Step 0: check universal_pre_new
-        for alpha in universal_pre:
-            g_check = astkh.And(G, astkh.Diamond(astkh.And(phi, astkh.Not(alpha))))
-            z3_model = s5solver.get_model(g_check)
-            result = z3_model.check()
-            if result != sat:
-                j, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives)
-                if j == "UNSAT":
-                    return "UNSAT"
-                else:
-                    return j, G_new, M_new, universal_pre_new
-
-        # Step 1: find problematic posts
-        post_prob = []
-        for beta in M_post:
-            g_check = astkh.And(G, astkh.Diamond(astkh.And(beta, astkh.Not(psi))))
-            z3_model = s5solver.get_model(g_check)
-            result = z3_model.check()
-            if result != sat:
-                post_prob.append(beta)
-
-        if (verbose) :
-            print(f"  post_prob: {[str(b) for b in post_prob]}")
-
-        if not post_prob:
-            if (verbose) :
-                print("  No problematic posts, this negative is safe.")
+        if prob_pair is None:
+            if verbose: 
+                log(log_file, f"  ~Kh({phi},{psi}) -> no problematic pairs, skipping")
             continue
 
-        # Step 2: find problematic pres
-        pre_prob = []
-        for alpha in M_pre:
-            g_check = astkh.And(G, astkh.Diamond(astkh.And(phi, astkh.Not(alpha))))
-            z3_model = s5solver.get_model(g_check)
-            result = z3_model.check()
-            if result != sat:
-                pre_prob.append(alpha)
+        pre_prob, post_prob = prob_pair
 
-        if (verbose) :
-            print(f"  pre_prob: {[str(a) for a in pre_prob]}")
-
-        if not pre_prob:
-            if (verbose) :
-                print("  No problematic pres, this negative is safe.")
-            continue
-
-        # Step 3: check path in matrix
         for alpha in pre_prob:
+            alpha_str = str(alpha)
+            row = M_x.get(alpha_str)
+            if not row:
+                continue
+                
             for beta in post_prob:
-                if M_x[str(alpha)][str(beta)] == True:
-                    if (verbose) :
-                        print(f"  Dangerous path found: M_x[{alpha}][{beta}] = T, invoking backtracking...")
-                    j, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives)
+                if row.get(str(beta)) is True:
+                    if verbose: 
+                        log(log_file, f"  ~Kh({phi},{psi}) -> CONFLICT at M_x[{alpha}][{beta}] = T")
+                        log(log_file, f"    This means Kh({phi},{psi}) is forced true, backtracking...")
+                    j, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives, forced_existential)
                     if j == "UNSAT":
                         return "UNSAT"
                     else:
-                        return j, G_new, M_new, universal_pre_new
+                        return j, G_new, M_new, universal_pre_new, forced_existential
 
     return "SAT"
 
-def solver(problem):
+def solver(problem, verbose=False):
     assert isinstance(problem, astkh.Clauses)
     start_time = time.perf_counter()
+
+    log_file = get_log_file() if verbose else None
 
     positives = [form for form in problem.clauses if isinstance(form, astkh.Kh)]
     negatives = [form for form in problem.clauses if isinstance(form, astkh.NKh)]
@@ -311,115 +404,89 @@ def solver(problem):
     M = []
     universal_pre = []
     stack = []
+    forced_existential = []
     pos = 0
 
     # if there is no negative forms we have to check only the positive ones
     if (negatives == []) :
-        first_and = astkh.Top()
-        # now we compute the big conjunction:  
-        for f in positives :
-            # Θ+
-            first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
-        if verbose :
-            print(first_and)
-        z3_model = s5solver.get_model(first_and)
-        result = z3_model.check()
-        if result == sat :
-            end_time = time.perf_counter()
-            print("The formula is SAT.")
-            if verbose :
-                print("Model:")
-                print(z3_model.model())
-            print(f"Time: {str(end_time - start_time)} seconds." )
-            return # we exit because a solution was found
-
-        else:
-            end_time = time.perf_counter()
-            print("The formula is UNSAT.")
-            print(f"Time: {str(end_time - start_time)} seconds.")
-            return
+        theta_pos = build_theta_pos(positives, log_file, verbose)
+        if verbose:
+            log(log_file, f"\n[ONLY POSITIVES] theta_pos = {theta_pos}")
+            log_file.close()
+        solve_and_print(theta_pos, start_time, verbose)
+        return
 
     # if there is no positive forms we have to check only the negative ones
     if (positives == []) :
-        second_and = astkh.Top()
-        # now we compute the big conjunction:  
-        for f in negatives :
-            # Θ-
-            second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
-        if verbose :
-            print(second_and)
-        z3_model = s5solver.get_model(second_and)
-        result = z3_model.check()
-        if result == sat :
-            end_time = time.perf_counter()
-            print("The formula is SAT.")
-            if verbose :
-                print("Model:")
-                print(z3_model.model())
-            print(f"Time: {str(end_time - start_time)} seconds." )
-            return # we exit because a solution was found
-        else:
-            end_time = time.perf_counter()
-            print("The formula is UNSAT.")
-            print(f"Time: {str(end_time - start_time)} seconds.")
-            return
+        theta_neg = build_theta_neg(negatives, log_file, verbose)
+        if verbose:
+            log(log_file, f"\n[ONLY NEGATIVES] theta_neg = {theta_neg}")
+            log_file.close()
+        solve_and_print(theta_neg, start_time, verbose)
+        return
 
     # there are positive and negative atoms
     # First, check SAT for Θ+ ∧ Θ- 
-    first_and = astkh.Top()
-    for f in positives :
-        first_and = astkh.And(first_and, astkh.Or(astkh.Box(astkh.Not(f.left)), astkh.Diamond(f.right)))
-    second_and = astkh.Top()
-    for f in negatives :
-        second_and = astkh.And(second_and, astkh.Diamond(astkh.And(f.left, astkh.Not(f.right))))
-    z3_model = s5solver.get_model(astkh.And(first_and, second_and))
-    result = z3_model.check()
-    if result != sat :
-        print("UNSAT")
-        print("Formula: theta /\\ theta' is unsat")
-        print("Rest of formulas unprocesed.")
-        end_time = time.perf_counter()
-        print(f"Time: {str(end_time - start_time)} seconds." )
-        return 
+    theta_pos = build_theta_pos(positives, log_file, verbose)
+    theta_neg = build_theta_neg(negatives, log_file, verbose)
+    combined_formula = astkh.And(theta_pos, theta_neg)
 
+    z3_model = s5solver.get_model(combined_formula)
+    initial_result = z3_model.check()
 
+    log_initial_check(log_file, combined_formula, initial_result, verbose)
+
+    if initial_result != sat:
+        return finish_with_log("UNSAT", start_time, log_file, "Formula: theta /\\ theta' is unsat\nRest of formulas unprocessed.")
+
+    #empieza el main loop
+    iteration = 0
     while True:
-        print(f"\n[solver] Calling build_G from pos={pos}")
-        result = build_G(positives, pos, G, M, universal_pre, stack)
+        iteration += 1
+        log_iteration_header(log_file, iteration, pos, verbose)
 
-        if result == "UNSAT":
-            end_time = time.perf_counter()
-            print("The formula is UNSAT.")
-            print(f"Time: {str(end_time - start_time)} seconds.")
-            return "UNSAT"
-        else:
-            G, M, universal_pre_new, stack = result
+        status, G, M, universal_pre, stack, forced_existential = build_G(positives, pos, G, M, universal_pre, stack, log_file, forced_existential, verbose)
+
+        if status == "UNSAT":
+            return finish_with_log("UNSAT", start_time, log_file, "[build_G] Result: UNSAT")
+
+        log_build_g_finished(log_file, G, M, universal_pre, verbose)
+
+        # Validate universal preconditions
+        status, G, M, universal_pre, next_pos, forced_existential = check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential, verbose)
+        
+        if status == "UNSAT":
+            return finish_with_log("UNSAT", start_time, log_file, "[check_universal_preconditions] Result: UNSAT")
+        elif status == "BACKTRACK":
+            log_backtrack(log_file, "check_universal_preconditions", next_pos - 1, G, M, universal_pre, verbose)
+            pos = next_pos
+            continue
 
         M_pre, M_post = get_pre_post_conditions(M)
-        M_x = build_matrix(M, M_pre, M_post)
-        M_x = complete_matrix(G, M, M_pre, M_post, M_x)
 
-        if (verbose) :
-            print("\n[solver] Matrix after complete_matrix:")
-            print_matrix(M_x, M_pre, M_post)
+        prob_res = get_problematics(negatives, M_pre, M_post, G, log_file, verbose)
 
-        result = check_negatives(negatives, G, M_pre, M_post, M_x, stack, positives, M, universal_pre_new)
+        if prob_res == "SAT":
+            return finish_with_log("SAT", start_time, log_file, "[get_problematics] No problematic pairs found -> SAT")
 
-        if result == "SAT":
-            end_time = time.perf_counter()
-            print("The formula is SAT.")
-            print(f"Time: {str(end_time - start_time)} seconds.")
-            return "SAT"
+        map_prob = prob_res
+        log_problematics_found(log_file, map_prob, verbose)
 
-        elif result == "UNSAT":
-            end_time = time.perf_counter()
-            print("The formula is UNSAT.")
-            print(f"Time: {str(end_time - start_time)} seconds.")
-            return "UNSAT"
+        M_x = build_matrix(M, M_pre, M_post, log_file, verbose)
+        M_x = complete_matrix(G, M, M_pre, M_post, M_x, log_file, verbose)
+
+        result = check_negatives(negatives, G, M_x, stack, positives, M, universal_pre, map_prob, log_file, forced_existential, verbose)
+
+        if result in ["SAT", "UNSAT"]:
+            return finish_with_log(result, start_time, log_file, f"[check_negatives] Result: {result}")
 
         else:
-            status, G, M, universal_pre = result
+            status, G, M, universal_pre, forced_existential = result
+            log_backtrack(log_file, "check_negatives", status + 1, G, M, universal_pre, forced_existential, verbose)
             pos = status + 1
+
+    if log_file:
+        log_file.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -435,13 +502,13 @@ if __name__ == "__main__":
     if args.form:
         problem = args.form
         parsed_form = khparser.parse(problem)
-        solver(parsed_form)
+        solver(parsed_form, verbose)
     elif args.file:
         file_name = args.file
         with open(file_name, "r") as file:
             problem = file.read()
             parsed_form = khparser.parse(problem)
-            solver(parsed_form)
+            solver(parsed_form, verbose)
     else:
         parser.print_help(sys.stderr)
         sys.exit(1)
