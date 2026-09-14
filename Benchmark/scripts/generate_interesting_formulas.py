@@ -4,7 +4,7 @@ import random
 # Definir la ruta base del script y la carpeta de salida 'interesting_formulas_shuffled'
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
-path_interesting_formulas_shuffled = os.path.join(project_root, 'interesting_formulas_shuffled')
+path_interesting_formulas_shuffled = os.path.join(project_root, 'interesting_formulas')
 
 # Crear la carpeta de destino si no existe
 os.makedirs(path_interesting_formulas_shuffled, exist_ok=True)
@@ -24,8 +24,8 @@ def create_interesting_formulas_shuffled(m):
     # 1. Generar la lista de átomos positivos
     positives = [kh_pos(i) for i in range(m)]
 
-    # 2. Mezclar/Desordenar la lista de átomos positivos aleatoriamente
-    random.shuffle(positives)
+    # 2. Mezclar la lista de átomos positivos aleatoriamente
+    #random.shuffle(positives)
 
     # 3. Concatenar los átomos positivos desordenados con ';'
     # 4. Agregar la fórmula negativa al final

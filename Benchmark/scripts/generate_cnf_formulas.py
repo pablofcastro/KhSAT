@@ -35,7 +35,7 @@ def generate_neg_atom():
     return f"~Kh({pi},{pj})"
 
 def create_complex_formula(num_positives):
-    # Nombre del archivo actualizado con el formato solicitado
+    
     formula_name = f"formula{num_positives + 1}-{num_positives}-1.kh"
     file_path = os.path.join(output_dir, formula_name)
 
