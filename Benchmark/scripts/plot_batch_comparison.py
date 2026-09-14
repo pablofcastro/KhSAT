@@ -8,8 +8,8 @@ import numpy as np
 def generate_plots(batch_ind):
     graphs_dir = Path("graphs")
     
-    csv_inc = graphs_dir / f"formulas_batch_{batch_ind}_incremental.csv"
-    csv_basic = graphs_dir / f"formulas_batch_{batch_ind}_basic_opt.csv"
+    csv_inc = graphs_dir / f"cnf_formulas_batch_{batch_ind}_incremental.csv"    #aca cambiar
+    csv_basic = graphs_dir / f"cnf_formulas_batch_{batch_ind}_basic_opt.csv"
 
     if not csv_inc.exists() or not csv_basic.exists():
         print(f"Error: No se encontraron los archivos necesarios en '{graphs_dir}/'.")
@@ -86,7 +86,7 @@ def generate_plots(batch_ind):
     ax_pie.set_title(f'Relative Performance - 2x Rule (Batch {batch_ind})\nTotal: {total_formulas} formulas', fontsize=12)
     plt.tight_layout()
 
-    pie_plot_name = graphs_dir / f"pie_speedup_batch_{batch_ind}.png"
+    pie_plot_name = graphs_dir / f"pie_cnf_formulas_{batch_ind}.png"    #aca cambiar
     plt.savefig(pie_plot_name, dpi=300)
     plt.close(fig_pie)
     print(f"[OK] Pie chart guardado en: {pie_plot_name} (Total procesadas: {total_formulas})")
@@ -121,7 +121,7 @@ def generate_plots(batch_ind):
                         ha='center', va='bottom')
 
     plt.tight_layout()
-    plot_name = graphs_dir / f"comparison_plot_batch_{batch_ind}.png"
+    plot_name = graphs_dir / f"comparison_cnf_formulas_batch_{batch_ind}.png"   #aca cambiar
     plt.savefig(plot_name, dpi=300)
     plt.close(fig1)
     print(f"[OK] Comparison plot guardado en: {plot_name}")

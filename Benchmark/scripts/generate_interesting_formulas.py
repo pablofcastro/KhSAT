@@ -1,31 +1,43 @@
 import os
+import random
 
-path_interesting_formulas = os.path.join(os.path.dirname(__file__), '..', 'interesting_formulas')
+# Definir la ruta base del script y la carpeta de salida 'interesting_formulas_shuffled'
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+path_interesting_formulas_shuffled = os.path.join(project_root, 'interesting_formulas_shuffled')
 
-#positive atom
+# Crear la carpeta de destino si no existe
+os.makedirs(path_interesting_formulas_shuffled, exist_ok=True)
+
+# Átomo positivo
 def kh_pos(i):
-  return f"Kh(p{i},p{i+1})"
+    return f"Kh(p{i},p{i+1})"
 
-#negative atom
+# Átomo negativo
 def kh_neg(m):
-  return f"~Kh(p0,p{m})"
+    return f"~Kh(p0,p{m})"
 
-def create_interesting_formulas(m):
-    formula_name = f"formula{m}-{m}-1.kh"
-    file = os.path.join(path_interesting_formulas, formula_name)
+def create_interesting_formulas_shuffled(m):
+    formula_name = f"formula{m+1}-{m}-1.kh"
+    file_path = os.path.join(path_interesting_formulas_shuffled, formula_name)
 
-    interesting_formula = ""
+    # 1. Generar la lista de átomos positivos
+    positives = [kh_pos(i) for i in range(m)]
 
-    for i in range (0, m):
-        interesting_formula = interesting_formula + kh_pos(i) + ";"
+    # 2. Mezclar/Desordenar la lista de átomos positivos aleatoriamente
+    random.shuffle(positives)
 
-    interesting_formula = interesting_formula + kh_neg(m)
+    # 3. Concatenar los átomos positivos desordenados con ';'
+    # 4. Agregar la fórmula negativa al final
+    if positives:
+        interesting_formula = ";".join(positives) + ";" + kh_neg(m)
+    else:
+        interesting_formula = kh_neg(m)
 
-    with open(file, "w") as f:
-        f.write(interesting_formula) 
+    # Guardar en el archivo correspondiente
+    with open(file_path, "w") as f:
+        f.write(interesting_formula)
 
-
-if __name__ == "__main__" :
-   create_interesting_formulas(3)
-   for m in range (1, 50):  
-      create_interesting_formulas(m)
+if __name__ == "__main__":
+    for m in range(1, 50):  
+        create_interesting_formulas_shuffled(m)
