@@ -35,6 +35,7 @@ intohylo_grammar = """
 
     ?implication: conjunction
                 | conjunction "->" implication -> implication
+                | conjunction "<->" implication -> dimplication
 
     // Se conserva la precedencia original: | antes que &
     ?conjunction: disjunction
@@ -51,8 +52,8 @@ intohylo_grammar = """
           | "false" -> false
           | "(" form ")"
 
-    var: /[a-z_][a-z0-9_]*/
-    RELATION: /[a-zA-Z][a-zA-Z0-9_]*/
+    var: /p\d+/
+    RELATION: /r\d+/
 
     %import common.WS
     %ignore WS
@@ -102,6 +103,11 @@ class IntoHyloASTTransformer(Transformer):
 
     def implication(self, left, right):
         return ast.Or(ast.Not(left), right)
+
+    def dimplication(self, left, right):
+        left_to_right = ast.Or(ast.Not(left), right)
+        right_to_left = ast.Or(ast.Not(right), left)
+        return ast.And(left_to_right, right_to_left)
 
 # Create the Lark parser instances for both grammars
 plain_parser = Lark(grammar, start="start", parser="lalr")
