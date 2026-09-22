@@ -25,7 +25,10 @@ class Var(Form):
         self.name = name
 
     def __str__(self):
-        return self.name
+        # Caché perezoso: memoriza el string la primera vez
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = self.name
+        return self._str_cache
     
     def accept(self, visitor, info=None) :
         return visitor.visit_var(self, info)
@@ -37,7 +40,9 @@ class Constant(Form):
         self.value = value
 
     def __str__(self):
-        return self.value
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = self.value
+        return self._str_cache
 
     def accept(self, visitor, info=None) :
         pass
@@ -69,7 +74,9 @@ class UnaryOperation(Form):
 # Unary operation 
 class Not(UnaryOperation):
     def __str__(self):
-        return f"not {self.operand}"
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = f"not {self.operand}"
+        return self._str_cache
 
     def accept(self, visitor, info=None) :
         return visitor.visit_not(self, info)
@@ -78,7 +85,9 @@ class Not(UnaryOperation):
 # Unary operation for box
 class Box(UnaryOperation):
     def __str__(self):
-        return f"A {self.operand}"
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = f"A {self.operand}"
+        return self._str_cache
 
     def accept(self, visitor, info=None) :
         return visitor.visit_box(self, info)
@@ -86,7 +95,9 @@ class Box(UnaryOperation):
 # Unary operation for diamond
 class Diamond(UnaryOperation):
     def __str__(self):
-        return f"E {self.operand}"
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = f"E {self.operand}"
+        return self._str_cache
 
     def accept(self, visitor, info = None) :
         return visitor.visit_diamond(self, info)
@@ -105,7 +116,9 @@ class BinaryOperation(Form):
 # Binary operation for and
 class And(BinaryOperation):
     def __str__(self):
-        return f"({self.left} & {self.right})"
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = f"({self.left} & {self.right})"
+        return self._str_cache
 
     def accept(self, visitor, info=None) :
         return visitor.visit_and(self, info)
@@ -113,7 +126,9 @@ class And(BinaryOperation):
 # Binary operation for or
 class Or(BinaryOperation):
     def __str__(self):
-        return f"({self.left} | {self.right})"
+        if not hasattr(self, '_str_cache'):
+            self._str_cache = f"({self.left} | {self.right})"
+        return self._str_cache
 
     def accept(self, visitor, info=None) :
         return visitor.visit_or(self, info)

@@ -13,45 +13,33 @@ verbose = False
 
 def validate_file(f):
     if not os.path.exists(f):
-        # error: argument input: x does not exist
         raise argparse.ArgumentTypeError(f"Couldn't find {f}.")
     return f
 
-def get_model(parsed_form) : 
-    """ It returns a model for performing sat for already constructed formula"""
-    nnf_visitor = tonnf.ToNNF()
-    # a diamond visitor is created
-    diamond_visitor = diamond_counter.DiamondVisitor()
-    # formula is parser
-    #parsed_form = s5parser.parse(formula)
-    # the formula is translated to nnf
-    nnf_form = parsed_form.accept(nnf_visitor)
-    # we count the number of diamonds
-    n = nnf_form.accept(diamond_visitor)
-    # we translate the formula to sat
-    sat_visitor = tosat.ToSAT(n+1)
-    boolean_form = nnf_form.accept(sat_visitor,1)
-    s = Solver()
-    s.add(boolean_form)
-    return s
-
 def satS5(formula) :
     overall_start = time.perf_counter()
-    translation_start = time.perf_counter()
-    # a nnf visitor is created
-    nnf_visitor = tonnf.ToNNF()
-    # a diamond visitor is created
-    diamond_visitor = diamond_counter.DiamondVisitor()
-    # formula is parser
+    
+    # 1. PARSEO
+    t0 = time.perf_counter()
     parsed_form = s5parser.parse(formula)
-    # the formula is translated to nnf
+    parse_time = time.perf_counter() - t0
+    
+    # 2. NNF
+    t1 = time.perf_counter()
+    nnf_visitor = tonnf.ToNNF()
     nnf_form = parsed_form.accept(nnf_visitor)
-    # we count the number of diamonds
+    nnf_time = time.perf_counter() - t1
+    
+    # 3. CONTEO DE DIAMANTES Y SAT
+    t2 = time.perf_counter()
+    diamond_visitor = diamond_counter.DiamondVisitor()
     n = nnf_form.accept(diamond_visitor)
-    # we translate the formula to sat
     sat_visitor = tosat.ToSAT(n+1)
     boolean_form = nnf_form.accept(sat_visitor,1)
-    translation_time = time.perf_counter() - translation_start
+    to_sat_time = time.perf_counter() - t2
+    
+    translation_time = time.perf_counter() - overall_start
+
     if (verbose) :
         print("Parsed Formula:"+str(parsed_form))
         print("NNF Formula: "+str(nnf_form))
@@ -61,31 +49,29 @@ def satS5(formula) :
     s = Solver()
     s.add(boolean_form)
     
-    # -------- INICIO DE LA MEDICIÓN REAL --------
+    # -------- Z3 SOLVING --------
     z3_start = time.perf_counter()
     result = s.check()
     z3_time = time.perf_counter() - z3_start
     overall_time = time.perf_counter() - overall_start
-    # -------- FIN DE LA MEDICIÓN REAL --------
     
     if result == sat :
         print("The formula is SAT.")
-        print("Model:")
-        print(s.model())
+        if verbose:
+            print("Model:")
+            print(s.model())
     else :
-        print("the formula is unsat")
-    print(f"Translation time: {translation_time:.6f} seconds.")
-    print(f"Z3 time: {z3_time:.6f} seconds.")
-    print(f"Total time: {overall_time:.6f} seconds.")
+        print("The formula is unsat.")
+        
+    # El benchmark leerá exactamente estas líneas
+    print(f"Parse time: {parse_time:.6f}")
+    print(f"NNF time: {nnf_time:.6f}")
+    print(f"To SAT time: {to_sat_time:.6f}")
+    print(f"Translation time: {translation_time:.6f}")
+    print(f"Z3 time: {z3_time:.6f}")
+    print(f"Total time: {overall_time:.6f}")
 
 if __name__ == "__main__" :
-    """ This is the main function of the solver 
-        the options can be:
-        + --help: shows the options
-        + --file (-f): process a file
-        + --inline (-i): takes a formula from the command line
-        + --verbose (-v): increase the output verbosity
-    """
     parser = argparse.ArgumentParser()
     file = ""
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
@@ -107,6 +93,3 @@ if __name__ == "__main__" :
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
-
-
-
