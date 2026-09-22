@@ -43,13 +43,13 @@ class ToNNF(visitor.FormulaVisitor) :
                 self.result[str(not_exp)] = ast.And(left.accept(self), right.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Box)) :   # box case  
-                operand = ast.Not(subform.left)
+                operand = ast.Not(subform.operand)
                 self.result[str(not_exp)] = ast.Diamond(operand.accept(self))
                 #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
                 #self.result[str(not_exp)] = ast.Diamond(subform.left.accept(self))
                 #return new_form
             elif (isinstance(subform, ast.Diamond)) :  #  diamond case
-                operand = ast.Not(subform.left)
+                operand = ast.Not(subform.operand)
                 self.result[str(not_exp)] = ast.Box(operand.accept(self))
                 #self.result[str(not_exp)] = ast.Box(subform.left.accept(self))
                 #return new_form

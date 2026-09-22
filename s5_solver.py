@@ -16,7 +16,25 @@ def validate_file(f):
         raise argparse.ArgumentTypeError(f"Couldn't find {f}.")
     return f
 
-def satS5(formula) :
+def get_model(parsed_form) : 
+    """ It returns a model for performing sat for already constructed formula"""
+    nnf_visitor = tonnf.ToNNF()
+    # a diamond visitor is created
+    diamond_visitor = diamond_counter.DiamondVisitor()
+    # formula is parser
+    #parsed_form = s5parser.parse(formula)
+    # the formula is translated to nnf
+    nnf_form = parsed_form.accept(nnf_visitor)
+    # we count the number of diamonds
+    n = nnf_form.accept(diamond_visitor)
+    # we translate the formula to sat
+    sat_visitor = tosat.ToSAT(n+1)
+    boolean_form = nnf_form.accept(sat_visitor,1)
+    s = Solver()
+    s.add(boolean_form)
+    return s
+
+def satS5(formula, intohylo=False) :
     overall_start = time.perf_counter()
     
     # 1. PARSEO
@@ -26,7 +44,13 @@ def satS5(formula) :
     
     # 2. NNF
     t1 = time.perf_counter()
+    # a nnf visitor is created
     nnf_visitor = tonnf.ToNNF()
+    # a diamond visitor is created
+    diamond_visitor = diamond_counter.DiamondVisitor()
+    # formula is parser
+    parsed_form = s5parser.parse(formula, intohylo=intohylo)
+    # the formula is translated to nnf
     nnf_form = parsed_form.accept(nnf_visitor)
     nnf_time = time.perf_counter() - t1
     
@@ -77,6 +101,7 @@ if __name__ == "__main__" :
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-f", "--file", dest="file", type=validate_file,
                         help="the file with the formula", metavar="FILE")
+    parser.add_argument("--intohylo", action="store_true", help="interprets diamonds as <r1> and boxes as [r1]")
     parser.add_argument("-i", "--inline", dest="form", help="takes a formula as inline input", metavar="FORMULA")
     args = parser.parse_args()
     
@@ -84,12 +109,12 @@ if __name__ == "__main__" :
         verbose = True 
     if args.form :
         problem = args.form
-        satS5(problem)
+        satS5(problem, intohylo=args.intohylo)
     elif args.file :
         file_name = args.file 
         with open(file_name, "r") as file:
             problem = file.read() 
-            satS5(problem)
+            satS5(problem, intohylo=args.intohylo)
     else :
         parser.print_help(sys.stderr)
         sys.exit(1)
