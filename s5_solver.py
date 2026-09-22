@@ -39,7 +39,7 @@ def satS5(formula, intohylo=False) :
     
     # 1. PARSEO
     t0 = time.perf_counter()
-    parsed_form = s5parser.parse(formula)
+    parsed_form = s5parser.parse(formula, intohylo=intohylo)
     parse_time = time.perf_counter() - t0
     
     # 2. NNF
@@ -48,8 +48,6 @@ def satS5(formula, intohylo=False) :
     nnf_visitor = tonnf.ToNNF()
     # a diamond visitor is created
     diamond_visitor = diamond_counter.DiamondVisitor()
-    # formula is parser
-    parsed_form = s5parser.parse(formula, intohylo=intohylo)
     # the formula is translated to nnf
     nnf_form = parsed_form.accept(nnf_visitor)
     nnf_time = time.perf_counter() - t1
