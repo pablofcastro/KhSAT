@@ -209,3 +209,4 @@ __marimo__/
 Benchmark/.DS_Store
 Benchmark/generator/.DS_Store
 Benchmark/generator/.vscode/launch.json
+profile_results.txt
