@@ -1,51 +1,67 @@
 import sys
-import random
 import os
 import s5
 
-benchmark_size = 20
-benchmark_instance = 0
+benchmark_size = 10 
 benchmark_path = "../formulasS5/"
 
 if __name__ == '__main__':
+    os.makedirs(benchmark_path, exist_ok=True)
+    
+    n_values = [120]
+    l = 3
+    
+    # 1. Worlds for test
+    W_values = [400, 600, 1000]
+    
+    # 2. RATIO MODAL
+    modal_ratios = [ 0.7, 0.8, 0.9, 1.0, 1.1]
 
-    argv = sys.argv[1:]
+    generated = 0
+    omited = 0
+    impossible = 0
+    
+    for n in n_values:
+        for W_target in W_values:
+            D = W_target + 10 
 
-    if len(argv) >= 2:
-        if argv[0] == "-r":
-            # in this case we generate a random formula with the given parameters
+            predicted_ratio = 0.0050 * W_target + 4.25
+            # Create a larger window around the predicted peak to encompass more ratios
+            r_min = max(4.0, round(predicted_ratio - 5.0, 1))
+            r_max = round(predicted_ratio + 5.0, 1)
 
-            n = int(argv[1])
-            m = int(argv[2])
-            l = int(argv[3])
-            p = float(argv[4])
-
-            for i in range(2,benchmark_size) :
-                for j in range(10) :
-                    fname = benchmark_path+f"formula{i}-{n}-{m}-{l}-{p}.s5"
-                    print("Generating formula: "+fname)
-                    ffile = open(fname,'w')
-                    ffile.write(f"{s5.phi(n, m, l, p)}")
-                    ffile.close()
-
-    elif len(argv) == 1 and argv[0] == "-benchmark" :
-        l = 3
-        # in this case, we generate the benchmark based on the relationship between clauses and the number of variables
-        
-        n_values = [100,120]
-        pd_values = [0.2, 0.45,0.5,0.55, 0.8]
-        for i in range(2,benchmark_size) :
-            for n in n_values:                
-                for pd in pd_values:
-                    ratios = [2.0, 4.0, 5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 11.0, 12.0, 15.0]
+            ratios = []
+            r = r_min
+            while r <= r_max + 0.1:
+                ratios.append(round(r, 1))
+                r += 0.5
+                
+            print(f"-> For W={W_target}, the predicted ratio is {predicted_ratio:.2f}. Exploring only: {ratios}")
+            
+            for Rm in modal_ratios:
+                B = int(D / Rm) 
+                
+                for r in ratios:
+                    m = int(n * r)
                     
-                    for j in ratios:
-                        m = int(n * j) 
-                        fname = benchmark_path + f"formula{i}-{n}-{m}-{l}-{p}-{pd}.s5"
-                        print(f"Generating: {fname} | Ratio: {j}")
-                        with open(fname, 'w') as ffile:
-                            ffile.write(f"{s5.phi(n, m, l, p, pd)}")
-    else:
-        print(f'error: incorrect number of arguments.')
-        print(f'  use: {argv[0]} | -benchmark')
-
+                    if (W_target - 1) > m or (D + B) > (m * l):
+                        impossible += 1
+                        continue 
+                        
+                    for i in range(1, benchmark_size + 1):
+                        fname = os.path.join(benchmark_path, f"formula{i}-{n}-{m}-{l}-{D}-{B}.s5")
+                        
+                        if os.path.exists(fname):
+                            omited += 1
+                            continue
+                            
+                        try:
+                            formula_str = s5.phi(n, m, l, D, B, W_target)
+                            with open(fname, 'w') as ffile:
+                                ffile.write(formula_str)
+                            generated += 1
+                        except Exception as e:
+                            print(f"Error en {fname}: {e}")
+                            
+    print(f"\nGeneración finalizada.")
+    print(f"Nuevas: {generated} | omited: {omited} | impossible: {impossible}")

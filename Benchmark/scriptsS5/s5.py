@@ -1,65 +1,69 @@
 import random
 
-diamonds_generated = 0
-# W = MAX_DIAMONS + 1
-MAX_DIAMONDS = 3000000000000000
-
-def random_var(n):
-    return f"p{random.randint(0,n-1)}"
-
-def literal(n, p, pd):
-    global diamonds_generated
-    lit = random_var(n)
-
-    if random.random() < 0.5:
-        lit = f"~{lit}"
-        
-    if random.random() < p:
-
-        if diamonds_generated < MAX_DIAMONDS:
-            if random.random() < pd:
-                op = "E"
-                diamonds_generated += 1
-            else:
-                op = "A"
-        else:
-            op = "A"
-        lit = f"{op} {lit}"
-
-    return lit
- 
-def clause(n,l,p,pd):
-    
-    r = "("
-    
-    for _ in range(l):
-    
-        r += literal(n,p,pd) + " | "
-    
-    return r[:-3] + ")" 
-    
-
-def phi(n ,m ,l ,p,pd):
-
+def phi(n, m, l, D, B, W):
     """
-    Generate fórmula S5 random in CNF format using the New K-CNF method.
-    
-    n: Number of propositional variables available (N)
-    m: Total number of clauses (L in the paper)
-    L: Size of each clause (K)
-    P: Proportion of purely propositional literals in each clause (p)
-    pd: Proportion between Box and diamond operator
+    Generador S5 con Control Topológico Exacto.
+    D = Diamantes exactos
+    B = Cajas exactas
+    W = Mundos exactos
     """
+    target_d_clauses = W - 1 # Cláusulas que DEBEN tener al menos un diamante
     
-    global diamonds_generated
-    # ¡ESTO ES CRÍTICO! Reiniciamos los mundos para CADA fórmula nueva
-    diamonds_generated = 0
-        
-    r = ""
+    # --- Controles de Física Matemática ---
+    if target_d_clauses > D:
+        raise ValueError(f"Faltan diamantes: Para {W} mundos necesitas mínimo {target_d_clauses} diamantes.")
+    if target_d_clauses > m:
+        raise ValueError(f"Faltan cláusulas: Para {W} mundos necesitas mínimo {target_d_clauses} cláusulas.")
+    if (D + B) > (m * l):
+        raise ValueError("Falta espacio: Tienes más operadores que literales totales.")
 
-    for _ in range(m):
-        
-        r+= clause(n,l,p,pd) + " & "
+    # 1. Crear matriz de operadores (m cláusulas x l huecos vacíos)
+    ops_matrix = [["" for _ in range(l)] for _ in range(m)]
     
-    return r[:-3]  
+    # 2. Elegir cuáles cláusulas serán las "Creadoras de Mundos"
+    d_clause_indices = random.sample(range(m), target_d_clauses)
+    
+    # 3. Garantizar al menos 1 Diamante (E) en cada cláusula creadora
+    for idx in d_clause_indices:
+        pos = random.randint(0, l - 1)
+        ops_matrix[idx][pos] = "E"
+        
+    # 4. Repartir los Diamantes (E) sobrantes SOLO en las cláusulas creadoras
+    # (Para no crear mundos accidentales en otras cláusulas)
+    remaining_E = D - target_d_clauses
+    available_E_spots = [(i, j) for i in d_clause_indices for j in range(l) if ops_matrix[i][j] == ""]
+    
+    if remaining_E > len(available_E_spots):
+        raise ValueError("Las cláusulas creadoras están llenas, no caben los diamantes sobrantes.")
+        
+    chosen_E_spots = random.sample(available_E_spots, remaining_E)
+    for i, j in chosen_E_spots:
+        ops_matrix[i][j] = "E"
+        
+    # 5. Repartir las Cajas (A) en cualquier hueco sobrante de CUALQUIER cláusula
+    available_A_spots = [(i, j) for i in range(m) for j in range(l) if ops_matrix[i][j] == ""]
+    if B > len(available_A_spots):
+         raise ValueError("No hay suficiente espacio para las Cajas (A).")
+         
+    chosen_A_spots = random.sample(available_A_spots, B)
+    for i, j in chosen_A_spots:
+        ops_matrix[i][j] = "A"
+
+    # 6. Construir la fórmula S5 real
+    clauses_str = []
+    for i in range(m):
+        clause_lits = []
+        for j in range(l):
+            var = f"p{random.randint(0, n-1)}"
+            if random.random() < 0.5:
+                var = f"~{var}" # Negación
             
+            op = ops_matrix[i][j]
+            if op != "":
+                clause_lits.append(f"{op} {var}")
+            else:
+                clause_lits.append(var)
+        
+        clauses_str.append("(" + " | ".join(clause_lits) + ")")
+        
+    return " & ".join(clauses_str)

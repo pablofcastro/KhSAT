@@ -36,7 +36,8 @@ def get_model(parsed_form) :
     return s
 
 def satS5(formula) :
-    #start_time = time.perf_counter()
+    overall_start = time.perf_counter()
+    translation_start = time.perf_counter()
     # a nnf visitor is created
     nnf_visitor = tonnf.ToNNF()
     # a diamond visitor is created
@@ -50,6 +51,7 @@ def satS5(formula) :
     # we translate the formula to sat
     sat_visitor = tosat.ToSAT(n+1)
     boolean_form = nnf_form.accept(sat_visitor,1)
+    translation_time = time.perf_counter() - translation_start
     if (verbose) :
         print("Parsed Formula:"+str(parsed_form))
         print("NNF Formula: "+str(nnf_form))
@@ -60,11 +62,10 @@ def satS5(formula) :
     s.add(boolean_form)
     
     # -------- INICIO DE LA MEDICIÓN REAL --------
-    start_time = time.perf_counter()
-    
+    z3_start = time.perf_counter()
     result = s.check()
-    
-    end_time = time.perf_counter()
+    z3_time = time.perf_counter() - z3_start
+    overall_time = time.perf_counter() - overall_start
     # -------- FIN DE LA MEDICIÓN REAL --------
     
     if result == sat :
@@ -73,7 +74,9 @@ def satS5(formula) :
         print(s.model())
     else :
         print("the formula is unsat")
-    print(f"Time: {str(end_time - start_time)} seconds." )
+    print(f"Translation time: {translation_time:.6f} seconds.")
+    print(f"Z3 time: {z3_time:.6f} seconds.")
+    print(f"Total time: {overall_time:.6f} seconds.")
 
 if __name__ == "__main__" :
     """ This is the main function of the solver 
