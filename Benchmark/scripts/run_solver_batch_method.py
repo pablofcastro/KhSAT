@@ -33,7 +33,7 @@ def run_solver(instance_path, method):
         print(f"Error running {instance_path} with method {method}: {e}")
         return "ERR", "300"
 
-#acá cambiar la carpeta de als formulas
+#acá cambiar la carpeta de las formulas
 def process_batch(i, formulas_dir="../cnf_formulas/", method="incremental"):
     pattern = re.compile(r"formula(\d+)-(\d+)-(\d+).kh$")
     files = []
@@ -90,7 +90,7 @@ def process_batch(i, formulas_dir="../cnf_formulas/", method="incremental"):
     
     # Nombre de archivo dinámico según lote y método
     method_clean = method.replace("-", "_")
-    csv_file = graphs_dir / f"cnf_formulas_batch_{i}_{method_clean}.csv"    #aca cambiar el nombre de .csv
+    csv_file = graphs_dir / f"cnf_formulas_batch_{i}_{method_clean}.csv" #aca cambiar el nombre de .csv
     
     with open(csv_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir",
         type=str,
-        default="../formulas/",
+        default="../cnf_formulas/", #cambiar
         help="Path to the directory containing formulas (default: ../formulas/)"
     )
     parser.add_argument("--batch", type=int, default=1, help="The batch to be processed (default: 1)")

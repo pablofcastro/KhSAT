@@ -213,7 +213,7 @@ def get_problematics(negatives, M_pre, M_post, G, log_file, verbose=False):
 
     return map_prob if map_prob else "SAT"
 
-def check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential=None, verbose=False):
+def check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential=None, verbose=False, skip_optimization= False):
     """
     Checks if universal preconditions in universal_pre are compatible with the negative formulas under G.
     """
@@ -243,10 +243,14 @@ def check_universal_preconditions(negatives, G, M, universal_pre, stack, positiv
             
             if result != sat:
                 # Register all positive indices that had alpha as universal precondition as forced existential
-                for fi in alpha_indices:
-                    if fi not in forced_existential:
-                        forced_existential.append(fi)
-                target_idx = min(alpha_indices)
+                if(skip_optimization):
+                    forced_existential = None
+                    target_idx = None
+                else:
+                    for fi in alpha_indices:
+                        if fi not in forced_existential:
+                            forced_existential.append(fi)
+                    target_idx = min(alpha_indices)                    
 
                 if verbose: 
                     log(log_file, f"  -> Conflict detected: ({phi_clean}) implies ({alpha_clean})")
@@ -391,6 +395,144 @@ def check_negatives(negatives, G, M_x, stack, positives, M, universal_pre, map_p
 
     return "SAT"
 
+def complete_and_check_matrix(G, M, M_pre, M_post, M_x, negatives, map_prob, stack, positives, universal_pre, log_file, forced_existential=None, verbose=False):
+    if verbose:
+        log(log_file, "\n[complete_and_check_matrix] Starting")
+
+    if forced_existential is None:
+        forced_existential = []
+
+    str_to_post = {str(psi): psi for psi in M_post}
+
+    implies_cache = {}
+    depends = {str(phi): set() for phi in M_pre}
+
+   # collect all conflict pairs
+    active_conflict_pairs = {}
+    for nkh in negatives:
+        key = (str(nkh.left), str(nkh.right))
+        prob_pair = map_prob.get(key)
+        if prob_pair:
+            pre_prob, post_prob = prob_pair
+            for alpha in pre_prob:
+                for beta in post_prob:
+                    active_conflict_pairs[(str(alpha), str(beta))] = nkh
+
+
+    # checks for conflicts in a pair (phi_str, psi_str) and triggers backtracking if one is found.
+    def check_conflict(phi_str, psi_str):
+        pair = (phi_str, psi_str)
+        if pair in active_conflict_pairs:
+            if verbose:
+                log(log_file, f" CONFLICT DETECTED at M_x[{phi_str}][{psi_str}] = T")
+            j, G_new, M_new, universal_pre_new = backtracking(G, M, universal_pre, stack, positives, forced_existential)
+            if j == "UNSAT":
+                return ("CONFLICT", "UNSAT")
+            else:
+                return ("CONFLICT", (j, G_new, M_new, universal_pre_new, forced_existential))
+        return ("OK", None)
+
+    # check for pre-existing conflicts in the matrix.
+    for (alpha_str, beta_str), nkh in active_conflict_pairs.items():
+        if M_x.get(alpha_str, {}).get(beta_str) is True:
+            if verbose:
+                log(log_file, f" CONFLICT PRE-EXISTING at M_x[{alpha_str}][{beta_str}] = T")
+            status, result = check_conflict(alpha_str, beta_str)
+            if status == "CONFLICT":
+                return result
+
+    # initialize the queue with pre-problematic and their post
+    queue = deque()
+    in_queue = set()
+
+    all_pre_prob_str = {alpha_str for (alpha_str, _) in active_conflict_pairs.keys()}
+
+    # search in M_x to find which post alpha_str reaches. Potential dangerous paths.
+    for alpha_str in all_pre_prob_str:
+        if alpha_str in M_x:
+            for psi_str, is_active in M_x[alpha_str].items():
+                if is_active is True:
+                    item = (alpha_str, psi_str)
+                    if item not in in_queue:
+                        queue.append(item)
+                        in_queue.add(item)
+
+    # transitive propagation loop
+    while queue:
+        phi_orig_str, psi_str = queue.popleft() #acá saco una pre problematica, junto a una post que llega
+        in_queue.discard((phi_orig_str, psi_str))
+
+        psi = str_to_post[psi_str]
+
+        for phi_prima in M_pre:
+            phi_prima_str = str(phi_prima)
+
+            # query Z3 lazily
+            # given the post-condition of a problematic pre-condition, we examine one by one which pre-condition it implies.
+            pair_key = (psi_str, phi_prima_str)
+            if pair_key not in implies_cache:
+                g_check = astkh.And(G, astkh.Diamond(astkh.And(psi, astkh.Not(phi_prima))))
+                z3_model = s5solver.get_model(g_check)
+                implies_cache[pair_key] = (z3_model.check() != sat)
+
+            # We continue because for the moment there is no dangerous path, let's see another pre
+            if not implies_cache[pair_key]:
+                continue
+
+            # Register dependency
+            depends[phi_prima_str].add(phi_orig_str)
+
+            # See where phi_prime ends up in the matrix.
+            for psi_new_str, is_reachable in M_x[phi_prima_str].items():
+                if is_reachable is not True:
+                    continue
+
+                # Actualizar alcanzabilidad transitiva para phi_orig
+                if M_x[phi_orig_str][psi_new_str] != True:
+                    M_x[phi_orig_str][psi_new_str] = True
+
+                    # Chequear conflicto para phi_orig
+                    status, result = check_conflict(phi_orig_str, psi_new_str)
+                    if status == "CONFLICT":
+                        return result
+
+                    # Encolar para continuar exploración desde phi_orig
+                    new_item = (phi_orig_str, psi_new_str)
+                    if new_item not in in_queue:
+                        queue.append(new_item)
+                        in_queue.add(new_item)
+
+                # Propagate to dependents of phi_orig: 
+                # if phi_orig now reaches psi_new, all those that depended on phi_orig also reach psi_new. 
+                # We also enqueue them so they continue exploring from psi_new.
+                for dep_phi_str in depends[phi_orig_str]:
+                    if M_x[dep_phi_str][psi_new_str] != True:
+                        M_x[dep_phi_str][psi_new_str] = True
+
+                        # Check for conflict for dep_phi
+                        status, result = check_conflict(dep_phi_str, psi_new_str)
+                        if status == "CONFLICT":
+                            return result
+
+                        # Encolar dep_phi para continuar exploración transitiva
+                        #dep_item = (dep_phi_str, psi_new_str)
+                        #if dep_item not in in_queue:
+                        #    queue.append(dep_item)
+                        #    in_queue.add(dep_item)
+
+                        # Only enqueue if dep_phi_str is a problematic precondition
+                        if dep_phi_str in all_pre_prob_str:
+                            dep_item = (dep_phi_str, psi_new_str)
+                            if dep_item not in in_queue:
+                                queue.append(dep_item)
+                                in_queue.add(dep_item)
+
+    if verbose:
+        log(log_file, "[complete_and_check_matrix] Matrix complete without conflicts.")
+        log_matrix(log_file, M_x, M_pre, M_post)
+
+    return "SAT"
+
 def solver(problem, verbose=False):
     assert isinstance(problem, astkh.Clauses)
     start_time = time.perf_counter()
@@ -453,7 +595,8 @@ def solver(problem, verbose=False):
         log_build_g_finished(log_file, G, M, universal_pre, verbose)
 
         # Validate universal preconditions
-        status, G, M, universal_pre, next_pos, forced_existential = check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential, verbose)
+        skip_optimization = False
+        status, G, M, universal_pre, next_pos, forced_existential = check_universal_preconditions(negatives, G, M, universal_pre, stack, positives, pos, log_file, forced_existential, verbose, skip_optimization)
         
         if status == "UNSAT":
             return finish_with_log("UNSAT", start_time, log_file, "[check_universal_preconditions] Result: UNSAT")
@@ -473,6 +616,8 @@ def solver(problem, verbose=False):
         log_problematics_found(log_file, map_prob, verbose)
 
         M_x = build_matrix(M, M_pre, M_post, log_file, verbose)
+
+        #result = complete_and_check_matrix(G, M, M_pre, M_post, M_x, negatives, map_prob, stack, positives, universal_pre, log_file, forced_existential=forced_existential, verbose=verbose)
         M_x = complete_matrix(G, M, M_pre, M_post, M_x, log_file, verbose)
 
         result = check_negatives(negatives, G, M_x, stack, positives, M, universal_pre, map_prob, log_file, forced_existential, verbose)

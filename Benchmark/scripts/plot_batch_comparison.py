@@ -86,7 +86,7 @@ def generate_plots(batch_ind):
     ax_pie.set_title(f'Relative Performance - 2x Rule (Batch {batch_ind})\nTotal: {total_formulas} formulas', fontsize=12)
     plt.tight_layout()
 
-    pie_plot_name = graphs_dir / f"pie_cnf_formulas_{batch_ind}.png"    #aca cambiar
+    pie_plot_name = graphs_dir / f"pie_speedup_cnf_batch_{batch_ind}.png"    #aca cambiar
     plt.savefig(pie_plot_name, dpi=300)
     plt.close(fig_pie)
     print(f"[OK] Pie chart guardado en: {pie_plot_name} (Total procesadas: {total_formulas})")
@@ -121,7 +121,7 @@ def generate_plots(batch_ind):
                         ha='center', va='bottom')
 
     plt.tight_layout()
-    plot_name = graphs_dir / f"comparison_cnf_formulas_batch_{batch_ind}.png"   #aca cambiar
+    plot_name = graphs_dir / f"comparison_plot_cnf_batch_{batch_ind}.png"   #aca cambiar
     plt.savefig(plot_name, dpi=300)
     plt.close(fig1)
     print(f"[OK] Comparison plot guardado en: {plot_name}")
