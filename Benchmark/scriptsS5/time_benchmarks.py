@@ -80,7 +80,7 @@ def parse_solver_output(output, metrics, results):
 def run_solver(instance_path, metrics, results):
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        solver_path = os.path.abspath(os.path.join(base_dir, "../../s5_solver.py"))
+        solver_path = os.path.abspath(os.path.join(base_dir, "../../s5_solver_dcc.py"))
         
         process = subprocess.run(
             [sys.executable, solver_path, "-f", instance_path],
