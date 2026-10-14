@@ -4,12 +4,12 @@ S5 to Z3 propositional translator using DCC compressed world universe bounds.
 
 import S5.AST_S5 as ast
 import S5.form_visitor as visitor
-from z3 import Bool, BoolRef, main_ctx, z3core
+from z3 import Bool, BoolRef, BoolVal, main_ctx, z3core
 
 
 def fast_and(args, ctx=None):
     if not args:
-        return True
+        return BoolVal(True, ctx=ctx)
     if len(args) == 1:
         return args[0]
     ctx = main_ctx() if ctx is None else ctx
@@ -22,7 +22,7 @@ def fast_and(args, ctx=None):
 
 def fast_or(args, ctx=None):
     if not args:
-        return False
+        return BoolVal(False, ctx=ctx)
     if len(args) == 1:
         return args[0]
     ctx = main_ctx() if ctx is None else ctx
@@ -61,10 +61,10 @@ class ToSAT(visitor.FormulaVisitor):
         return res
 
     def visit_true(self, cons, info=None):
-        return True
+        return BoolVal(True, ctx=self.ctx)
 
     def visit_false(self, cons, info=None):
-        return False
+        return BoolVal(False, ctx=self.ctx)
 
     def visit_not(self, notexp, info=None):
         child = notexp.operand.accept(self, info)
@@ -96,7 +96,6 @@ class ToSAT(visitor.FormulaVisitor):
             return self.modal_cache[nodo_id]
 
         subform = boxexp.operand
-        # Boxes must hold across all W worlds in the compressed DCC model
         subforms = [subform.accept(self, i + 1) for i in range(self.size)]
         res = fast_and(subforms, self.ctx)
         self.modal_cache[nodo_id] = res
@@ -108,7 +107,6 @@ class ToSAT(visitor.FormulaVisitor):
             return self.modal_cache[nodo_id]
 
         subform = diamondexp.operand
-        # Diamonds disjunct across the compressed universe of W = dcc_size worlds
         subforms = [subform.accept(self, i + 1) for i in range(self.size)]
         res = fast_or(subforms, self.ctx)
 
