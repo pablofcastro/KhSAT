@@ -46,7 +46,7 @@ This is the default format; do not pass `--intohylo`.
 - `E` means diamond and `A` means box: `E x`, `A x`.
 - `~` means negation, `&` conjunction, and `|` disjunction.
 - Parentheses can be used to group expressions. The constants `true` and `false` are also supported.
-- `&` has higher precedence than `|`. For example, `x | y & z` is interpreted as `x | (y & z)`.
+- `|` has higher precedence than `&`. For example, `x | y & z` is interpreted as `(x | y) & z`.
 - Variable names start with a lowercase letter or `_`, followed by lowercase letters, digits, or `_`.
 
 Examples:
@@ -66,7 +66,7 @@ Pass `--intohylo` to use this format. Formulas must be enclosed by `begin` and `
 - Implication (`->`) and equivalence (`<->`) are also supported.
 - Variables must be `p` followed by one or more digits, such as `p1` or `p23`.
 - Relation labels must be `r` followed by one or more digits, such as `r1`.
-- `|` has higher precedence than `&` in this format. Use parentheses to make the intended grouping clear.
+- `|` has higher precedence than `&`, as in the S5 format. For example, `p1 | p2 & p3` is interpreted as `(p1 | p2) & p3`. Use parentheses to make the intended grouping clear.
 
 Examples:
 
