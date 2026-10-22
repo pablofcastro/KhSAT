@@ -174,6 +174,14 @@ python Benchmark/scriptsS5/cheetah_benchmarks.py --runs 5 --timeout 300
 
 Each formula is solved by both solvers `--runs` times and the median time is reported. The results are saved in `tiempos_comparacion/cheetah_vs_khsat.csv` with the verdicts (SAT/UNSAT), generated Kripke worlds, solver times, the speedup `total_time_cheetah / total_time_khsat` and the Kripke model verification for KhSAT. A summary with the soundness match, verified models and win counts for each solver is printed at the end.
 
+An example for execute benchmarks compare with Cheetah:
+``` bash
+LD_LIBRARY_PATH=$(mise where python@2.7.18)/lib python3 ./Benchmark/scriptsS5/cheetah_benchmarks.py \                            
+  --folder Benchmark/formulasCheetah/... \
+  --cheetah-bin /home/.../S5Cheetah2.0_bin/Cheetah2.0 \
+  --solver-script s5_solver_dcc.py
+```
+
 #### Options
 
 - `--folder` - folder with the benchmark formulas (default: `formulasCheetahS5`)
